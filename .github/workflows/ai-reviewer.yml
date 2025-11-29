@@ -1,5 +1,8 @@
 # Reusable AI Reviewer Workflow
 #
+# Required secrets:
+#   - GEMINI_API_KEY: API key for Google Gemini AI service
+#
 # Usage:
 #   jobs:
 #     ai-review:

@@ -1,0 +1,92 @@
+# Reusable Security Workflow
+#
+# Usage:
+#   jobs:
+#     security:
+#       uses: smkwlab/.github/.github/workflows/security.yml@v1.1.0
+#       secrets: inherit
+
+name: Security (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      otp-version:
+        description: 'OTP version'
+        default: '28.2'
+        required: false
+        type: string
+      elixir-version:
+        description: 'Elixir version'
+        default: '1.19.4'
+        required: false
+        type: string
+      dependency-audit-timeout:
+        description: 'Dependency audit job timeout in minutes'
+        default: 15
+        required: false
+        type: number
+      secret-scan-timeout:
+        description: 'Secret scan job timeout in minutes'
+        default: 10
+        required: false
+        type: number
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    name: Dependency Security Audit
+    timeout-minutes: ${{ inputs.dependency-audit-timeout }}
+
+    steps:
+    - name: Set up Git repository
+      uses: actions/checkout@v4
+
+    - name: Set up Elixir
+      uses: erlef/setup-beam@v1
+      with:
+        otp-version: ${{ inputs.otp-version }}
+        elixir-version: ${{ inputs.elixir-version }}
+
+    - name: Restore dependencies cache
+      uses: actions/cache@v4
+      with:
+        path: deps
+        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-mix-
+
+    - name: Install dependencies
+      run: mix deps.get
+
+    - name: Run dependency security audit
+      run: |
+        mix archive.install hex mix_audit --force
+        if ! mix deps.audit; then
+          echo "❌ Vulnerable dependencies found!"
+          exit 1
+        else
+          echo "✅ No vulnerable dependencies found"
+        fi
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.secret-scan-timeout }}
+
+    steps:
+    - name: Set up Git repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Scan for secrets in codebase
+      uses: trufflesecurity/trufflehog@v3.88.0
+      with:
+        path: ./
+        base: ${{ github.event.before || 'HEAD~1' }}
+        head: HEAD
+        extra_args: --debug --only-verified

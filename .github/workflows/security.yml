@@ -66,9 +66,8 @@ jobs:
     - name: Run dependency security audit
       run: |
         mix archive.install hex mix_audit --force
-        if mix deps.audit 2>&1 | grep -q "vulnerable"; then
+        if ! mix deps.audit; then
           echo "❌ Vulnerable dependencies found!"
-          mix deps.audit
           exit 1
         else
           echo "✅ No vulnerable dependencies found"
@@ -86,7 +85,7 @@ jobs:
         fetch-depth: 0
 
     - name: Scan for secrets in codebase
-      uses: trufflesecurity/trufflehog@main
+      uses: trufflesecurity/trufflehog@v3.88.0
       with:
         path: ./
         base: ${{ github.event.before || 'HEAD~1' }}

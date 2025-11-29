@@ -54,13 +54,20 @@ jobs:
         otp-version: ${{ inputs.otp-version }}
         elixir-version: ${{ inputs.elixir-version }}
 
+    - name: Restore dependencies cache
+      uses: actions/cache@v4
+      with:
+        path: deps
+        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-mix-
+
     - name: Install dependencies
       run: mix deps.get
 
     - name: Update dependencies
       run: |
         mix deps.update --all
-        mix deps.unlock --check-unused
+        mix deps.unlock --unused
 
     - name: Compile dependencies
       run: mix deps.compile
@@ -86,7 +93,7 @@ jobs:
           echo "CHANGE_SUMMARY<<EOF" >> $GITHUB_ENV
           echo "## Dependency Changes" >> $GITHUB_ENV
           echo "" >> $GITHUB_ENV
-          git diff mix.lock | grep -E '^[+-]' | grep -v '^[+-]{3}' | head -20 >> $GITHUB_ENV
+          git diff mix.lock | grep '^[+-]' | grep -v '^[+-]\{3\}' | head -20 >> $GITHUB_ENV || true
           echo "EOF" >> $GITHUB_ENV
         fi
 

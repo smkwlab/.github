@@ -203,13 +203,13 @@ jobs:
       run: |
         echo "Running Dialyzer analysis..."
         if mix dialyzer --format dialyxir > dialyzer_output.txt 2>&1; then
-          echo "result=success" >> $GITHUB_OUTPUT
+          echo "result=success" >> "$GITHUB_OUTPUT"
           echo "Dialyzer completed successfully"
         else
-          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "result=failure" >> "$GITHUB_OUTPUT"
           echo "Dialyzer found issues"
         fi
-        echo "output_file=dialyzer_output.txt" >> $GITHUB_OUTPUT
+        echo "output_file=dialyzer_output.txt" >> "$GITHUB_OUTPUT"
       continue-on-error: true
 
     - name: Read Dialyzer output
@@ -219,11 +219,13 @@ jobs:
         if [ -f dialyzer_output.txt ]; then
           echo "Reading Dialyzer output..."
           DIALYZER_OUTPUT=$(cat dialyzer_output.txt)
-          echo "dialyzer_output<<EOF" >> $GITHUB_OUTPUT
-          echo "$DIALYZER_OUTPUT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "dialyzer_output<<EOF"
+            echo "$DIALYZER_OUTPUT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
         else
-          echo "dialyzer_output=No Dialyzer output file found" >> $GITHUB_OUTPUT
+          echo "dialyzer_output=No Dialyzer output file found" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Create GitHub Issue for Dialyzer failures

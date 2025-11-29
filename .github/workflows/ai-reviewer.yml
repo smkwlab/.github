@@ -1,0 +1,50 @@
+# Reusable AI Reviewer Workflow
+#
+# Usage:
+#   jobs:
+#     ai-review:
+#       uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@v1.1.0
+#       secrets: inherit
+
+name: AI Reviewer (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      language:
+        description: 'Review language'
+        default: 'Japanese'
+        required: false
+        type: string
+      exclude-paths:
+        description: 'Paths to exclude from review'
+        default: '_build/**,deps/**,cover/**,log/**'
+        required: false
+        type: string
+      timeout-minutes:
+        description: 'Job timeout in minutes'
+        default: 10
+        required: false
+        type: number
+
+permissions:
+  pull-requests: write
+  contents: read
+
+# Prevent multiple reviews on rapid pushes
+concurrency:
+  group: ai-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - name: Gemini Review Bot
+        uses: Nasubikun/ai-reviewer@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LANGUAGE: ${{ inputs.language }}
+          EXCLUDE_PATHS: ${{ inputs.exclude-paths }}

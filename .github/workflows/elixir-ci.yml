@@ -4,8 +4,6 @@
 #   jobs:
 #     ci:
 #       uses: smkwlab/.github/.github/workflows/elixir-ci.yml@main
-#       with:
-#         coverage-threshold: 30  # optional
 #
 # See: https://github.com/smkwlab/tenbin_dns/issues/60
 
@@ -34,11 +32,6 @@ on:
         default: '1.19.4'
         required: false
         type: string
-      coverage-threshold:
-        description: 'Coverage threshold percentage'
-        default: 90
-        required: false
-        type: number
       dialyzer-enabled:
         description: 'Enable Dialyzer analysis'
         default: true
@@ -47,6 +40,11 @@ on:
       timeout-minutes:
         description: 'Job timeout in minutes'
         default: 15
+        required: false
+        type: number
+      dialyzer-timeout-minutes:
+        description: 'Dialyzer job timeout in minutes'
+        default: 20
         required: false
         type: number
 
@@ -84,7 +82,6 @@ jobs:
 
     - name: Run Credo
       run: mix credo --strict
-
 
   test:
     runs-on: ubuntu-latest
@@ -136,6 +133,9 @@ jobs:
       if: matrix.primary
       uses: codecov/codecov-action@v4
       with:
+        # For private repositories, set CODECOV_TOKEN secret in your repository
+        # See: https://docs.codecov.com/docs/github-actions#using-private-repositories
+        token: ${{ secrets.CODECOV_TOKEN }}
         directory: ./cover
         flags: unittests
         name: codecov-umbrella
@@ -152,7 +152,7 @@ jobs:
   dialyzer:
     if: ${{ inputs.dialyzer-enabled && github.event_name == 'push' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: ${{ inputs.dialyzer-timeout-minutes }}
     name: Dialyzer Analysis on OTP ${{ inputs.otp-version-latest }} / Elixir ${{ inputs.elixir-version-latest }}
 
     permissions:
@@ -229,9 +229,11 @@ jobs:
     - name: Create GitHub Issue for Dialyzer failures
       if: steps.dialyzer.outputs.result == 'failure'
       uses: actions/github-script@v7
+      env:
+        DIALYZER_OUTPUT: ${{ steps.read_output.outputs.dialyzer_output }}
       with:
         script: |
-          const dialyzerOutput = `${{ steps.read_output.outputs.dialyzer_output }}`;
+          const dialyzerOutput = process.env.DIALYZER_OUTPUT;
 
           const issueTitle = `Dialyzer warnings/errors in main branch (${context.sha.substring(0, 7)})`;
           const issueBody = `

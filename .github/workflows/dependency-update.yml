@@ -86,20 +86,22 @@ jobs:
       id: check_changes
       run: |
         if git diff --quiet; then
-          echo "changes=false" >> $GITHUB_OUTPUT
+          echo "changes=false" >> "$GITHUB_OUTPUT"
         else
-          echo "changes=true" >> $GITHUB_OUTPUT
+          echo "changes=true" >> "$GITHUB_OUTPUT"
           # Generate detailed change summary
-          echo "CHANGE_SUMMARY<<EOF" >> $GITHUB_ENV
-          echo "## Dependency Changes" >> $GITHUB_ENV
-          echo "" >> $GITHUB_ENV
-          git diff mix.lock | grep '^[+-]' | grep -v '^[+-]\{3\}' | head -20 >> $GITHUB_ENV || true
-          echo "EOF" >> $GITHUB_ENV
+          {
+            echo "CHANGE_SUMMARY<<EOF"
+            echo "## Dependency Changes"
+            echo ""
+            git diff mix.lock | grep '^[+-]' | grep -v '^[+-]\{3\}' | head -20 || true
+            echo "EOF"
+          } >> "$GITHUB_ENV"
         fi
 
     - name: Create Pull Request
       if: steps.check_changes.outputs.changes == 'true'
-      uses: peter-evans/create-pull-request@v5
+      uses: peter-evans/create-pull-request@v7
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         commit-message: "chore: update dependencies"

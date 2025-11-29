@@ -238,24 +238,24 @@ jobs:
           const dialyzerOutput = process.env.DIALYZER_OUTPUT;
 
           const issueTitle = `Dialyzer warnings/errors in main branch (${context.sha.substring(0, 7)})`;
-          const issueBody = `
-          ## Dialyzer Analysis Results
-
-          **Commit:** ${context.sha}
-          **Branch:** ${context.ref}
-          **Workflow run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
-          **OTP/Elixir:** ${{ inputs.otp-version-latest }}/${{ inputs.elixir-version-latest }}
-
-          ### Output:
-          \`\`\`
-          ${dialyzerOutput}
-          \`\`\`
-
-          Please review and fix these Dialyzer warnings/errors.
-
-          ---
-          *This issue was automatically created by the Elixir CI workflow.*
-          `;
+          const issueBody = [
+            '## Dialyzer Analysis Results',
+            '',
+            `**Commit:** ${context.sha}`,
+            `**Branch:** ${context.ref}`,
+            `**Workflow run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            `**OTP/Elixir:** ${{ inputs.otp-version-latest }}/${{ inputs.elixir-version-latest }}`,
+            '',
+            '### Output:',
+            '```',
+            dialyzerOutput,
+            '```',
+            '',
+            'Please review and fix these Dialyzer warnings/errors.',
+            '',
+            '---',
+            '*This issue was automatically created by the Elixir CI workflow.*'
+          ].join('\n');
 
           // Check if there's already an open issue for Dialyzer
           const issues = await github.rest.issues.listForRepo({
@@ -275,17 +275,18 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: existingIssue.number,
-              body: `## New Dialyzer Issues Found
-
-              **Commit:** ${context.sha}
-              **Workflow run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
-              **OTP/Elixir:** ${{ inputs.otp-version-latest }}/${{ inputs.elixir-version-latest }}
-
-              ### Output:
-              \`\`\`
-              ${dialyzerOutput}
-              \`\`\`
-              `
+              body: [
+                '## New Dialyzer Issues Found',
+                '',
+                `**Commit:** ${context.sha}`,
+                `**Workflow run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                `**OTP/Elixir:** ${{ inputs.otp-version-latest }}/${{ inputs.elixir-version-latest }}`,
+                '',
+                '### Output:',
+                '```',
+                dialyzerOutput,
+                '```'
+              ].join('\n')
             });
           } else {
             // Create new issue
@@ -294,7 +295,7 @@ jobs:
               repo: context.repo.repo,
               title: issueTitle,
               body: issueBody,
-              labels: ['dialyzer', 'automated', 'bug']
+              labels: ['dialyzer', 'automated']
             });
           }
 

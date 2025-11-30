@@ -70,7 +70,7 @@ jobs:
             echo "FILES<<EOF"
             echo "$FILES"
             echo "EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
 

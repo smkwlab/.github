@@ -25,11 +25,6 @@ on:
         required: false
         default: true
         type: boolean
-      action-version:
-        description: 'Version of latex-release-action to use'
-        required: false
-        default: 'v3.1.0'
-        type: string
 
 permissions:
   contents: write
@@ -44,7 +39,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Build and Release LaTeX Documents
-        uses: smkwlab/latex-release-action@${{ inputs.action-version }}
+        uses: smkwlab/latex-release-action@v3
         env:
           GH_TOKEN: ${{ github.token }}
         with:

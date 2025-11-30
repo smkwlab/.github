@@ -1,0 +1,120 @@
+---
+# Reusable Workflow: Notify Lab Mailing List on PR
+#
+# This workflow sends email notifications when PRs are created.
+# Use this from other repositories with:
+#
+#   jobs:
+#     notify:
+#       uses: smkwlab/.github/.github/workflows/notify-ml-on-pr.yml@v1
+#       secrets: inherit
+#
+name: Notify Lab ML on PR
+
+on:
+  workflow_call:
+    inputs:
+      skip-draft:
+        description: 'Skip notification for draft PRs'
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      SMTP_SERVER:
+        required: true
+      SMTP_PORT:
+        required: true
+      SMTP_USERNAME:
+        required: true
+      SMTP_PASSWORD:
+        required: true
+      LAB_ML_ADDRESS:
+        required: true
+      SMTP_FROM:
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  notify-ml:
+    # Skip for draft PRs if configured
+    if: ${{ !inputs.skip-draft || !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check requirements
+        run: |
+          echo "::notice::ML notification workflow requires Organization Secrets"
+          echo "Required secrets: SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, LAB_ML_ADDRESS, SMTP_FROM"
+          echo "If this workflow fails due to missing secrets, please check your organization settings"
+          echo "For users outside the organization: you can safely delete this workflow file if not needed"
+
+      - name: Get PR details
+        id: pr_details
+        run: |
+          # Get commit list (max 10)
+          COMMITS=$(gh pr view ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --json commits \
+            --jq '.commits[] | "  * \(.messageHeadline)"' | head -10)
+
+          # Get file changes list (max 20)
+          FILES=$(gh pr view ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --json files \
+            --jq '.files[] | "  * \(.path) (+\(.additions)/-\(.deletions))"' | head -20)
+
+          # Set multiline environment variables
+          {
+            echo "COMMITS<<EOF"
+            echo "$COMMITS"
+            echo "EOF"
+            echo "FILES<<EOF"
+            echo "$FILES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Send notification email to lab ML
+        uses: dawidd6/action-send-mail@4226df7daafa6fc901a43789c49bf7ab309066e7  # v3.10.0
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "[PR] ${{ github.event.repository.name }}: ${{ github.event.pull_request.title }}"
+          to: ${{ secrets.LAB_ML_ADDRESS }}
+          from: ${{ secrets.SMTP_FROM }}
+          body: |
+            新しいPull Requestが作成されました
+
+            リポジトリ: ${{ github.event.repository.name }}
+            作成者: ${{ github.event.pull_request.user.login }}
+            タイトル: ${{ github.event.pull_request.title }}
+            ブランチ: ${{ github.event.pull_request.head.ref }} → ${{ github.event.pull_request.base.ref }}
+
+            説明:
+            ${{ github.event.pull_request.body || '(No description provided)' }}
+
+            You can view, comment on, or merge this pull request online at:
+
+              ${{ github.event.pull_request.html_url }}
+
+            -- Commit Summary --
+
+            ${{ steps.pr_details.outputs.COMMITS || '  (No commits available)' }}
+
+            -- File Changes --
+
+            ${{ steps.pr_details.outputs.FILES || '  (No files available)' }}
+
+            -- Patch Links --
+
+            ${{ github.event.pull_request.patch_url }}
+            ${{ github.event.pull_request.diff_url }}
+
+            ---
+            このメールはGitHub Actionsから自動送信されています

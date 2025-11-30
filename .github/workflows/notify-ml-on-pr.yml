@@ -40,7 +40,7 @@ permissions:
 jobs:
   notify-ml:
     # Skip for draft PRs if configured
-    if: !inputs.skip-draft || !github.event.pull_request.draft
+    if: ${{ !inputs.skip-draft || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
 
     steps:

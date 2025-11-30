@@ -44,9 +44,11 @@ jobs:
           if TAGS_AT_HEAD=$(git tag --points-at HEAD 2>/dev/null); then
             if echo "$TAGS_AT_HEAD" | grep -q "^final-"; then
               FINAL_TAG=$(echo "$TAGS_AT_HEAD" | grep "^final-" | head -1)
-              echo "is_draft=false" >> "$GITHUB_OUTPUT"
-              echo "is_final_submission=true" >> "$GITHUB_OUTPUT"
-              echo "final_tag=$FINAL_TAG" >> "$GITHUB_OUTPUT"
+              {
+                echo "is_draft=false"
+                echo "is_final_submission=true"
+                echo "final_tag=$FINAL_TAG"
+              } >> "$GITHUB_OUTPUT"
               echo "Final submission detected - merge allowed"
               echo "::notice::Final submission tag: $FINAL_TAG"
               exit 0
@@ -64,20 +66,16 @@ jobs:
 
           # Main draft branches (1st-draft, 2nd-draft, etc.)
           if [[ "$BRANCH_NAME" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]]; then
-            echo "is_draft=true" >> "$GITHUB_OUTPUT"
-            echo "draft_type=main" >> "$GITHUB_OUTPUT"
+            { echo "is_draft=true"; echo "draft_type=main"; } >> "$GITHUB_OUTPUT"
           # Abstract draft branches (abstract-1st, gaiyou-1st, etc.)
           elif [[ "$BRANCH_NAME" =~ ^(abstract|gaiyou)-[0-9]+(st|nd|rd|th)$ ]]; then
-            echo "is_draft=true" >> "$GITHUB_OUTPUT"
-            echo "draft_type=abstract" >> "$GITHUB_OUTPUT"
+            { echo "is_draft=true"; echo "draft_type=abstract"; } >> "$GITHUB_OUTPUT"
           # Initial submission branch (0th-draft)
           elif [[ "$BRANCH_NAME" =~ ^0th-draft$ ]]; then
-            echo "is_draft=true" >> "$GITHUB_OUTPUT"
-            echo "draft_type=initial" >> "$GITHUB_OUTPUT"
+            { echo "is_draft=true"; echo "draft_type=initial"; } >> "$GITHUB_OUTPUT"
           # Regular branches
           else
-            echo "is_draft=false" >> "$GITHUB_OUTPUT"
-            echo "draft_type=none" >> "$GITHUB_OUTPUT"
+            { echo "is_draft=false"; echo "draft_type=none"; } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Block draft branch merge

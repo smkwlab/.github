@@ -1,0 +1,134 @@
+---
+# Reusable Workflow: Create Next Draft Branch
+#
+# This workflow automatically creates the next draft branch when a PR is opened.
+# Use this from other repositories with:
+#
+#   jobs:
+#     create-next:
+#       uses: smkwlab/.github/.github/workflows/create-next-draft.yml@v1
+#
+name: Create Next Draft Branch
+
+on:
+  workflow_call:
+
+jobs:
+  create-next-branch:
+    runs-on: ubuntu-latest
+
+    # Only run for draft or abstract branch PRs
+    if: |
+      contains(github.head_ref, 'draft') ||
+      contains(github.head_ref, 'abstract-')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine next branch name
+        id: next-branch
+        run: |
+          CURRENT_BRANCH="${{ github.head_ref }}"
+
+          # Pattern matching to determine next branch name
+          if [[ "$CURRENT_BRANCH" =~ ^([0-9]+)(st|nd|rd|th)-draft$ ]]; then
+            # Main thesis branch (e.g., 1st-draft, 2nd-draft, etc.)
+            CURRENT_NUM="${BASH_REMATCH[1]}"
+            NEXT_NUM=$((CURRENT_NUM + 1))
+
+            # Determine ordinal suffix
+            case $NEXT_NUM in
+              1|21) SUFFIX="st" ;;
+              2|22) SUFFIX="nd" ;;
+              3|23) SUFFIX="rd" ;;
+              *) SUFFIX="th" ;;
+            esac
+
+            NEXT_BRANCH="${NEXT_NUM}${SUFFIX}-draft"
+
+          elif [[ "$CURRENT_BRANCH" =~ ^abstract-([0-9]+)(st|nd|rd|th)$ ]]; then
+            # Abstract branch (e.g., abstract-1st, abstract-2nd, etc.)
+            CURRENT_NUM="${BASH_REMATCH[1]}"
+            NEXT_NUM=$((CURRENT_NUM + 1))
+
+            # Determine ordinal suffix
+            case $NEXT_NUM in
+              1|21) SUFFIX="st" ;;
+              2|22) SUFFIX="nd" ;;
+              3|23) SUFFIX="rd" ;;
+              *) SUFFIX="th" ;;
+            esac
+
+            NEXT_BRANCH="abstract-${NEXT_NUM}${SUFFIX}"
+
+          elif [ "$CURRENT_BRANCH" = "0th-draft" ]; then
+            # Special case: 0th-draft → 1st-draft
+            NEXT_BRANCH="1st-draft"
+
+          else
+            echo "Unexpected branch name pattern: $CURRENT_BRANCH"
+            exit 0
+          fi
+
+          echo "next_branch=$NEXT_BRANCH" >> $GITHUB_OUTPUT
+          echo "current_branch=$CURRENT_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Check if next branch already exists
+        id: check-branch
+        run: |
+          NEXT_BRANCH="${{ steps.next-branch.outputs.next_branch }}"
+
+          if [ -z "$NEXT_BRANCH" ]; then
+            echo "exists=skip" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if git show-ref --verify --quiet "refs/remotes/origin/$NEXT_BRANCH"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create next draft branch
+        if: steps.check-branch.outputs.exists == 'false'
+        run: |
+          CURRENT_BRANCH="${{ steps.next-branch.outputs.current_branch }}"
+          NEXT_BRANCH="${{ steps.next-branch.outputs.next_branch }}"
+
+          # All branches are created based on current branch
+          BASE_BRANCH="origin/$CURRENT_BRANCH"
+
+          # Create branch
+          git checkout -b "$NEXT_BRANCH" "$BASE_BRANCH"
+          git push -u origin "$NEXT_BRANCH"
+
+          echo "Created $NEXT_BRANCH based on $CURRENT_BRANCH"
+
+      - name: Add comment to PR
+        if: steps.check-branch.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEXT_BRANCH="${{ steps.next-branch.outputs.next_branch }}"
+
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "Next draft branch has been automatically created: \`$NEXT_BRANCH\`"
+
+      - name: Add notice if branch exists
+        if: steps.check-branch.outputs.exists == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEXT_BRANCH="${{ steps.next-branch.outputs.next_branch }}"
+
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "Next draft branch already exists: \`$NEXT_BRANCH\`"

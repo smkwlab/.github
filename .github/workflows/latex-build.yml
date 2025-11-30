@@ -1,0 +1,52 @@
+---
+# Reusable Workflow: LaTeX PDF Build and Release
+#
+# This workflow builds LaTeX documents and creates releases.
+# Use this from other repositories with:
+#
+#   jobs:
+#     build:
+#       uses: smkwlab/.github/.github/workflows/latex-build.yml@v1
+#       with:
+#         files: "main, appendix"
+#
+name: LaTeX Build and Release
+
+on:
+  workflow_call:
+    inputs:
+      files:
+        description: 'Comma-separated list of LaTeX files to build (without .tex extension)'
+        required: false
+        default: 'main'
+        type: string
+      cleanup:
+        description: 'Whether to clean up intermediate files after build'
+        required: false
+        default: true
+        type: boolean
+      action-version:
+        description: 'Version of latex-release-action to use'
+        required: false
+        default: 'v3.1.0'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release-pdf:
+    name: Build LaTeX Documents and Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Build and Release LaTeX Documents
+        uses: smkwlab/latex-release-action@${{ inputs.action-version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          files: ${{ inputs.files }}
+          cleanup: ${{ inputs.cleanup }}

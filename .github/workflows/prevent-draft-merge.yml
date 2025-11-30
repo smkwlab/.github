@@ -1,0 +1,124 @@
+---
+# Reusable Workflow: Prevent Draft Branch Merge
+#
+# This workflow prevents accidental merging of draft branches.
+# Use this from other repositories with:
+#
+#   jobs:
+#     prevent-merge:
+#       uses: smkwlab/.github/.github/workflows/prevent-draft-merge.yml@v1
+#
+name: Prevent Draft Merge
+
+on:
+  workflow_call:
+
+jobs:
+  check-draft-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check if branch is draft
+        id: check-draft
+        run: |
+          set -e
+
+          BRANCH_NAME="${{ github.head_ref }}"
+          echo "::debug::Branch name: $BRANCH_NAME"
+
+          # Git repository status check
+          if ! git rev-parse --git-dir >/dev/null 2>&1; then
+            echo "::error::Git repository not found"
+            exit 1
+          fi
+
+          # Check for final-* tags
+          echo "::debug::Checking for final-* tags..."
+          TAGS_AT_HEAD=""
+          if TAGS_AT_HEAD=$(git tag --points-at HEAD 2>/dev/null); then
+            if echo "$TAGS_AT_HEAD" | grep -q "^final-"; then
+              FINAL_TAG=$(echo "$TAGS_AT_HEAD" | grep "^final-" | head -1)
+              echo "is_draft=false" >> $GITHUB_OUTPUT
+              echo "is_final_submission=true" >> $GITHUB_OUTPUT
+              echo "final_tag=$FINAL_TAG" >> $GITHUB_OUTPUT
+              echo "Final submission detected - merge allowed"
+              echo "::notice::Final submission tag: $FINAL_TAG"
+              exit 0
+            fi
+          fi
+
+          # Branch name validation
+          if [[ -z "$BRANCH_NAME" ]]; then
+            echo "::error::Branch name is empty"
+            exit 1
+          fi
+
+          # Check draft branch patterns
+          echo "::debug::Checking draft branch patterns..."
+
+          # Main draft branches (1st-draft, 2nd-draft, etc.)
+          if [[ "$BRANCH_NAME" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]]; then
+            echo "is_draft=true" >> $GITHUB_OUTPUT
+            echo "draft_type=main" >> $GITHUB_OUTPUT
+          # Abstract draft branches (abstract-1st, gaiyou-1st, etc.)
+          elif [[ "$BRANCH_NAME" =~ ^(abstract|gaiyou)-[0-9]+(st|nd|rd|th)$ ]]; then
+            echo "is_draft=true" >> $GITHUB_OUTPUT
+            echo "draft_type=abstract" >> $GITHUB_OUTPUT
+          # Initial submission branch (0th-draft)
+          elif [[ "$BRANCH_NAME" =~ ^0th-draft$ ]]; then
+            echo "is_draft=true" >> $GITHUB_OUTPUT
+            echo "draft_type=initial" >> $GITHUB_OUTPUT
+          # Regular branches
+          else
+            echo "is_draft=false" >> $GITHUB_OUTPUT
+            echo "draft_type=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Block draft branch merge
+        if: steps.check-draft.outputs.is_draft == 'true'
+        run: |
+          DRAFT_TYPE="${{ steps.check-draft.outputs.draft_type }}"
+          BRANCH_NAME="${{ github.head_ref }}"
+
+          echo "::error::Draft branch merge is not allowed"
+          echo "::error::Branch name: $BRANCH_NAME"
+          echo "::error::This PR is for faculty review"
+
+          # GitHub Summary for students
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## This is a Review PR
+
+          This PR is for **faculty review**.
+
+          **For Students**
+          - This "failure" is expected behavior (not an error)
+          - Please wait for faculty review
+          - Close the PR after addressing review comments
+          - Continue work on the next branch
+
+          **Purpose**
+          - Prevents accidental merges
+          - Ensures proper review workflow
+          EOF
+
+          exit 1
+
+      - name: Success - Non-draft branch
+        if: steps.check-draft.outputs.is_draft == 'false'
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          IS_FINAL="${{ steps.check-draft.outputs.is_final_submission }}"
+
+          if [[ "$IS_FINAL" == "true" ]]; then
+            FINAL_TAG="${{ steps.check-draft.outputs.final_tag }}"
+            echo "Final submission branch - merge allowed"
+            echo "Branch name: $BRANCH_NAME"
+            echo "Final submission tag: $FINAL_TAG"
+          else
+            echo "Regular branch - merge allowed"
+            echo "Branch name: $BRANCH_NAME"
+          fi

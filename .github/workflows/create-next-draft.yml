@@ -13,6 +13,10 @@ name: Create Next Draft Branch
 on:
   workflow_call:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   create-next-branch:
     runs-on: ubuntu-latest
@@ -120,7 +124,7 @@ jobs:
           CURRENT_BRANCH="${{ steps.next-branch.outputs.current_branch }}"
           NEXT_BRANCH="${{ steps.next-branch.outputs.next_branch }}"
 
-          # All branches are created based on current branch
+          # All branches are created based on the current branch
           BASE_BRANCH="origin/$CURRENT_BRANCH"
 
           # Create branch

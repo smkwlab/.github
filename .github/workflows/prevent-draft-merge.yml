@@ -13,6 +13,9 @@ name: Prevent Draft Merge
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   check-draft-branch:
     runs-on: ubuntu-latest
@@ -67,8 +70,8 @@ jobs:
           # Main draft branches (1st-draft, 2nd-draft, etc.)
           if [[ "$BRANCH_NAME" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]]; then
             { echo "is_draft=true"; echo "draft_type=main"; } >> "$GITHUB_OUTPUT"
-          # Abstract draft branches (abstract-1st, gaiyou-1st, etc.)
-          elif [[ "$BRANCH_NAME" =~ ^(abstract|gaiyou)-[0-9]+(st|nd|rd|th)$ ]]; then
+          # Abstract draft branches (abstract-1st, abstract-2nd, etc.)
+          elif [[ "$BRANCH_NAME" =~ ^abstract-[0-9]+(st|nd|rd|th)$ ]]; then
             { echo "is_draft=true"; echo "draft_type=abstract"; } >> "$GITHUB_OUTPUT"
           # Initial submission branch (0th-draft)
           elif [[ "$BRANCH_NAME" =~ ^0th-draft$ ]]; then

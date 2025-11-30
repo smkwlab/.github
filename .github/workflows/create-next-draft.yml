@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
 
       - name: Configure Git
         run: |
@@ -46,12 +46,19 @@ jobs:
             NEXT_NUM=$((CURRENT_NUM + 1))
 
             # Determine ordinal suffix
-            case $NEXT_NUM in
-              1|21) SUFFIX="st" ;;
-              2|22) SUFFIX="nd" ;;
-              3|23) SUFFIX="rd" ;;
-              *) SUFFIX="th" ;;
-            esac
+            LAST_TWO=$((NEXT_NUM % 100))
+            LAST_ONE=$((NEXT_NUM % 10))
+            if [[ $LAST_TWO -ge 11 && $LAST_TWO -le 13 ]]; then
+              SUFFIX="th"
+            elif [[ $LAST_ONE -eq 1 ]]; then
+              SUFFIX="st"
+            elif [[ $LAST_ONE -eq 2 ]]; then
+              SUFFIX="nd"
+            elif [[ $LAST_ONE -eq 3 ]]; then
+              SUFFIX="rd"
+            else
+              SUFFIX="th"
+            fi
 
             NEXT_BRANCH="${NEXT_NUM}${SUFFIX}-draft"
 
@@ -61,12 +68,19 @@ jobs:
             NEXT_NUM=$((CURRENT_NUM + 1))
 
             # Determine ordinal suffix
-            case $NEXT_NUM in
-              1|21) SUFFIX="st" ;;
-              2|22) SUFFIX="nd" ;;
-              3|23) SUFFIX="rd" ;;
-              *) SUFFIX="th" ;;
-            esac
+            LAST_TWO=$((NEXT_NUM % 100))
+            LAST_ONE=$((NEXT_NUM % 10))
+            if [[ $LAST_TWO -ge 11 && $LAST_TWO -le 13 ]]; then
+              SUFFIX="th"
+            elif [[ $LAST_ONE -eq 1 ]]; then
+              SUFFIX="st"
+            elif [[ $LAST_ONE -eq 2 ]]; then
+              SUFFIX="nd"
+            elif [[ $LAST_ONE -eq 3 ]]; then
+              SUFFIX="rd"
+            else
+              SUFFIX="th"
+            fi
 
             NEXT_BRANCH="abstract-${NEXT_NUM}${SUFFIX}"
 
@@ -116,7 +130,7 @@ jobs:
       - name: Add comment to PR
         if: steps.check-branch.outputs.exists == 'false'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           NEXT_BRANCH="${{ steps.next-branch.outputs.next_branch }}"
 
@@ -126,7 +140,7 @@ jobs:
       - name: Add notice if branch exists
         if: steps.check-branch.outputs.exists == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           NEXT_BRANCH="${{ steps.next-branch.outputs.next_branch }}"
 

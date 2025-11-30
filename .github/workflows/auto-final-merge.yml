@@ -1,0 +1,82 @@
+---
+# Reusable Workflow: Auto Final Merge
+#
+# This workflow automatically merges approved PRs when a final-* tag is pushed.
+# Use this from other repositories with:
+#
+#   jobs:
+#     auto-merge:
+#       uses: smkwlab/.github/.github/workflows/auto-final-merge.yml@main
+#
+name: Auto Final Merge
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge-to-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Find approved PR for this branch
+        id: find-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Identify the branch where the tag was pushed
+          TAG_COMMIT=$(git rev-parse HEAD)
+          BRANCH_NAME=$(git branch -r --contains "$TAG_COMMIT" | grep -v HEAD | head -1 | sed 's/origin\///' | xargs)
+
+          if [ -z "$BRANCH_NAME" ]; then
+            echo "::error::Cannot determine branch for this tag"
+            exit 1
+          fi
+
+          echo "Checking for approved PR from branch: $BRANCH_NAME"
+
+          # Search for approved PR from that branch to main
+          PR_NUMBER=$(gh pr list --state open --base main --head "$BRANCH_NAME" \
+            --json number,reviews \
+            --jq '.[] | select(.reviews | map(.state) | contains(["APPROVED"])) | .number')
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "approved_pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "Found approved PR #$PR_NUMBER from branch $BRANCH_NAME"
+          else
+            echo "::error::No approved PR found for branch $BRANCH_NAME"
+            echo "Please ensure:"
+            echo "1. PR from $BRANCH_NAME to main exists"
+            echo "2. PR has been approved by faculty"
+            exit 1
+          fi
+
+      - name: Auto merge approved PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER=${{ steps.find-pr.outputs.approved_pr }}
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+
+          # Auto-merge the PR
+          gh pr merge "$PR_NUMBER" --merge --delete-branch
+
+          echo "Automatically merged PR #$PR_NUMBER to main"
+          echo "Final submission complete with tag: $TAG_NAME"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          gh release create "$TAG_NAME" \
+            --title "Final Submission: $TAG_NAME" \
+            --notes "Auto-created for final submission. Tag: $TAG_NAME, Date: $(date)" \
+            --latest

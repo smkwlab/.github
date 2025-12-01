@@ -64,8 +64,9 @@ jobs:
 
     - name: Run dependency security audit
       run: |
-        mix archive.install hex mix_audit --force
-        if ! mix deps.audit; then
+        mix escript.install hex mix_audit --force
+        export PATH="$HOME/.mix/escripts:$PATH"
+        if ! mix_audit; then
           echo "❌ Vulnerable dependencies found!"
           exit 1
         else

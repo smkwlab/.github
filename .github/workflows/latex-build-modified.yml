@@ -1,0 +1,71 @@
+---
+# Reusable Workflow: LaTeX Build Modified Files
+#
+# Builds only modified TeX files and creates releases.
+# Designed for weekly report repositories.
+# Use this from other repositories with:
+#
+#   jobs:
+#     build:
+#       uses: smkwlab/.github/.github/workflows/latex-build-modified.yml@main
+#
+name: Build Modified PDFs
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  find-modified-tex:
+    runs-on: ubuntu-latest
+    outputs:
+      files: ${{ steps.set-files.outputs.files }}
+      has_files: ${{ steps.set-files.outputs.has_files }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      - id: set-files
+        run: |
+          # 変更・追加されたTeXファイルを検索し、拡張子を除いたファイル名をカンマ区切りで出力
+          files=$(git diff --name-only --diff-filter=AM HEAD^ HEAD | \
+            grep '\.tex$' | sed 's/\.tex$//' | paste -sd, || echo "")
+          if [ -z "$files" ]; then
+            echo "No modified or added TeX files found"
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+            echo "files=" >> "$GITHUB_OUTPUT"
+          else
+            echo "Modified or added TeX files: $files"
+            echo "has_files=true" >> "$GITHUB_OUTPUT"
+            echo "files=$files" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-release:
+    needs: find-modified-tex
+    runs-on: ubuntu-latest
+    container: ghcr.io/smkwlab/texlive-ja-textlint:2025g
+    if: needs.find-modified-tex.outputs.has_files == 'true'
+    steps:
+      - name: Prepare release name
+        id: release-name
+        run: |
+          # Convert comma-separated files to first file name for release title
+          files="${{ needs.find-modified-tex.outputs.files }}"
+          first_file=$(echo "$files" | cut -d',' -f1 | xargs)
+
+          # Error handling: Check if first_file is empty
+          if [ -z "$first_file" ]; then
+            echo "Error: No valid file name found"
+            exit 1
+          fi
+
+          echo "release_name=${first_file} Weekly Report" >> $GITHUB_OUTPUT
+          echo "tag_name=${first_file}-weekly" >> $GITHUB_OUTPUT
+
+      - uses: smkwlab/latex-release-action@v3
+        with:
+          files: ${{ needs.find-modified-tex.outputs.files }}
+          release_name: ${{ steps.release-name.outputs.release_name }}

@@ -31,8 +31,15 @@ jobs:
       - id: set-files
         run: |
           # 変更・追加されたTeXファイルを検索し、拡張子を除いたファイル名をカンマ区切りで出力
-          files=$(git diff --name-only --diff-filter=AM HEAD^ HEAD | \
-            grep '\.tex$' | sed 's/\.tex$//' | paste -sd, || echo "")
+          # If HEAD^ exists, diff against it; otherwise, diff against empty tree (first commit)
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            files=$(git diff --name-only --diff-filter=AM HEAD^ HEAD | \
+              grep '\.tex$' | sed 's/\.tex$//' | paste -sd, || echo "")
+          else
+            # Use the empty tree object for the first commit
+            files=$(git diff --name-only --diff-filter=AM $(git hash-object -t tree /dev/null) HEAD | \
+              grep '\.tex$' | sed 's/\.tex$//' | paste -sd, || echo "")
+          fi
           if [ -z "$files" ]; then
             echo "No modified or added TeX files found"
             echo "has_files=false" >> "$GITHUB_OUTPUT"
@@ -49,6 +56,8 @@ jobs:
     container: ghcr.io/smkwlab/texlive-ja-textlint:2025g
     if: needs.find-modified-tex.outputs.has_files == 'true'
     steps:
+      - uses: actions/checkout@v5
+
       - name: Prepare release name
         id: release-name
         run: |
@@ -62,8 +71,7 @@ jobs:
             exit 1
           fi
 
-          echo "release_name=${first_file} Weekly Report" >> $GITHUB_OUTPUT
-          echo "tag_name=${first_file}-weekly" >> $GITHUB_OUTPUT
+          echo "release_name=${first_file} Weekly Report" >> "$GITHUB_OUTPUT"
 
       - uses: smkwlab/latex-release-action@v3
         with:

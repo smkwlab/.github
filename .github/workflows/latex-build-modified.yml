@@ -37,7 +37,8 @@ jobs:
               grep '\.tex$' | sed 's/\.tex$//' | paste -sd, || echo "")
           else
             # Use the empty tree object for the first commit
-            files=$(git diff --name-only --diff-filter=AM $(git hash-object -t tree /dev/null) HEAD | \
+            empty_tree=$(git hash-object -t tree /dev/null)
+            files=$(git diff --name-only --diff-filter=AM "$empty_tree" HEAD | \
               grep '\.tex$' | sed 's/\.tex$//' | paste -sd, || echo "")
           fi
           if [ -z "$files" ]; then

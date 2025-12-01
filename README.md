@@ -136,7 +136,7 @@ Gemini AI を使用して PR の自動レビューを行います。
 | パラメータ | 必須 | デフォルト | 説明 |
 |-----------|:----:|-----------|------|
 | `language` | No | `Japanese` | レビュー言語 |
-| `exclude-paths` | No | `_build/**,...` | レビュー対象外パス |
+| `exclude-paths` | No | `_build/**,deps/**,cover/**,log/**` | レビュー対象外パス |
 | `timeout-minutes` | No | `10` | タイムアウト（分） |
 
 **必要なシークレット:**
@@ -171,13 +171,18 @@ HTML ファイルの品質チェックを実行します。
 
 ### elixir-ci.yml
 
-Elixir プロジェクト向けの CI ワークフローです。
+Elixir プロジェクト向けの CI ワークフローです。LTS と最新版の2つの環境でテストを実行します。
 
 **入力パラメータ:**
 | パラメータ | 必須 | デフォルト | 説明 |
 |-----------|:----:|-----------|------|
-| `otp-version` | No | `28.2` | OTP バージョン |
-| `elixir-version` | No | `1.19.4` | Elixir バージョン |
+| `otp-version-lts` | No | `27.3.4.4` | OTP LTS バージョン |
+| `elixir-version-lts` | No | `1.17.3` | Elixir LTS バージョン |
+| `otp-version-latest` | No | `28.2` | OTP 最新バージョン |
+| `elixir-version-latest` | No | `1.19.4` | Elixir 最新バージョン |
+| `dialyzer-enabled` | No | `true` | Dialyzer 静的解析を有効化 |
+| `timeout-minutes` | No | `15` | ジョブタイムアウト（分） |
+| `dialyzer-timeout-minutes` | No | `20` | Dialyzer タイムアウト（分） |
 
 ### dependency-update.yml
 

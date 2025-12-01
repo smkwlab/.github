@@ -49,7 +49,7 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 ```yaml
 jobs:
   build:
-    uses: smkwlab/.github/.github/workflows/<workflow-name>.yml@main
+    uses: smkwlab/.github/.github/workflows/<workflow-name>.yml@v1
 ```
 
 ### 使用例
@@ -64,7 +64,7 @@ on:
 
 jobs:
   build:
-    uses: smkwlab/.github/.github/workflows/latex-build.yml@main
+    uses: smkwlab/.github/.github/workflows/latex-build.yml@v1
     with:
       files: "sotsuron, gaiyou"
 ```
@@ -79,7 +79,7 @@ on:
 
 jobs:
   notify:
-    uses: smkwlab/.github/.github/workflows/notify-ml-on-pr.yml@main
+    uses: smkwlab/.github/.github/workflows/notify-ml-on-pr.yml@v1
     secrets: inherit
 ```
 
@@ -93,7 +93,7 @@ on:
 
 jobs:
   review:
-    uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@main
+    uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@v1
     secrets: inherit
 ```
 

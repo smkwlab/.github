@@ -66,7 +66,8 @@ jobs:
           echo "🔍 Checking basic accessibility..."
 
           # Check for alt attributes in images
-          missing_alt=$(find . -name "*.html" -exec grep -l '<img[^>]*>' {} \; | \
+          missing_alt=$(find . -name "*.html" -print0 | \
+            xargs -0 grep -l '<img[^>]*>' 2>/dev/null | \
             xargs grep -n '<img[^>]*>' 2>/dev/null | grep -v 'alt=' || true)
           if [ -n "$missing_alt" ]; then
             echo "⚠️  Found images without alt attributes:"
@@ -93,26 +94,25 @@ jobs:
       - name: Generate quality report
         if: always()
         run: |
-          echo "## 📊 HTML Quality Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Validation Results" >> $GITHUB_STEP_SUMMARY
-
-          echo "- 🔍 **HTML5 W3C Compliance**: Validated using html5validator" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔍 **HTMLHint Quality Check**: Validated using .htmlhintrc" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔍 **Accessibility Check**: Alt attributes and semantic headings verified" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔍 **CSS Syntax Check**: Brace matching validated" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          echo "### File Analysis" >> $GITHUB_STEP_SUMMARY
-          echo "- **HTML files processed**: $(find . -name '*.html' | wc -l)" >> $GITHUB_STEP_SUMMARY
-          echo "- **CSS files found**: $(find . -name '*.css' | wc -l)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          echo "### Quality Guidelines" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ All images should have meaningful alt attributes" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Use semantic HTML5 elements (header, main, section, etc.)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Maintain proper heading hierarchy (h1 → h2 → h3)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Ensure CSS follows proper syntax and formatting" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Configuration Files" >> $GITHUB_STEP_SUMMARY
-          echo "- \`.htmlhintrc\`: HTMLHint quality rules" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 📊 HTML Quality Report"
+            echo ""
+            echo "### Validation Results"
+            echo "- 🔍 **HTML5 W3C Compliance**: Validated using html5validator"
+            echo "- 🔍 **HTMLHint Quality Check**: Validated using .htmlhintrc"
+            echo "- 🔍 **Accessibility Check**: Alt attributes and semantic headings verified"
+            echo "- 🔍 **CSS Syntax Check**: Brace matching validated"
+            echo ""
+            echo "### File Analysis"
+            echo "- **HTML files processed**: $(find . -name '*.html' | wc -l)"
+            echo "- **CSS files found**: $(find . -name '*.css' | wc -l)"
+            echo ""
+            echo "### Quality Guidelines"
+            echo "- ✅ All images should have meaningful alt attributes"
+            echo "- ✅ Use semantic HTML5 elements (header, main, section, etc.)"
+            echo "- ✅ Maintain proper heading hierarchy (h1 → h2 → h3)"
+            echo "- ✅ Ensure CSS follows proper syntax and formatting"
+            echo ""
+            echo "### Configuration Files"
+            echo "- \`.htmlhintrc\`: HTMLHint quality rules"
+          } >> "$GITHUB_STEP_SUMMARY"

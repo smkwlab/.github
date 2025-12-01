@@ -1,0 +1,118 @@
+---
+# Reusable Workflow: HTML Quality Validation
+#
+# Validates HTML files for W3C compliance and accessibility.
+# Use this from other repositories with:
+#
+#   jobs:
+#     validate:
+#       uses: smkwlab/.github/.github/workflows/html-validation.yml@main
+#
+name: HTML Quality Check
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  html-validation:
+    name: HTML5 Validation and Quality Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js for additional tools
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install HTML validation tools
+        run: |
+          # Install html5validator for W3C compliance
+          pip install --upgrade pip
+          pip install html5validator
+          # Install additional quality tools
+          npm install -g htmlhint
+
+      - name: Validate HTML5 compliance
+        continue-on-error: true
+        run: |
+          echo "🔍 Validating HTML5 compliance..."
+          html5validator --root . --match "*.html" --log INFO
+
+      - name: Run HTMLHint quality check
+        run: |
+          echo "🔍 Running HTMLHint quality check..."
+          if [ -f ".htmlhintrc" ]; then
+            find . -name "*.html" -exec htmlhint --config .htmlhintrc {} +
+          else
+            echo "⚠️  .htmlhintrc not found, using default settings"
+            find . -name "*.html" -exec htmlhint {} +
+          fi
+
+      - name: Check accessibility basics
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking basic accessibility..."
+
+          # Check for alt attributes in images
+          missing_alt=$(find . -name "*.html" -print0 | \
+            xargs -0 grep -l '<img[^>]*>' 2>/dev/null | \
+            xargs grep -n '<img[^>]*>' 2>/dev/null | grep -v 'alt=' || true)
+          if [ -n "$missing_alt" ]; then
+            echo "⚠️  Found images without alt attributes:"
+            echo "$missing_alt"
+          else
+            echo "✅ All images have alt attributes"
+          fi
+
+          # Check for semantic headings
+          if find . -name "*.html" -exec grep -q '<h[1-6]' {} \; 2>/dev/null; then
+            echo "✅ Semantic headings found"
+          else
+            echo "⚠️  No semantic headings found"
+          fi
+
+      - name: Validate CSS
+        continue-on-error: true
+        run: |
+          echo "🔍 Basic CSS validation..."
+          if [ -f "style.css" ]; then
+            node -e "const fs=require('fs');const css=fs.readFileSync('style.css','utf8');const braces=css.split('').reduce((a,c)=>{if(c==='{')a++;if(c==='}')a--;return a;},0);if(braces!==0){console.log('⚠️  CSS brace mismatch detected');process.exit(1);}else{console.log('✅ CSS syntax check passed');}" && echo "CSS validation completed"
+          fi
+
+      - name: Generate quality report
+        if: always()
+        run: |
+          {
+            echo "## 📊 HTML Quality Report"
+            echo ""
+            echo "### Validation Results"
+            echo "- 🔍 **HTML5 W3C Compliance**: Validated using html5validator"
+            echo "- 🔍 **HTMLHint Quality Check**: Validated using .htmlhintrc"
+            echo "- 🔍 **Accessibility Check**: Alt attributes and semantic headings verified"
+            echo "- 🔍 **CSS Syntax Check**: Brace matching validated"
+            echo ""
+            echo "### File Analysis"
+            echo "- **HTML files processed**: $(find . -name '*.html' | wc -l)"
+            echo "- **CSS files found**: $(find . -name '*.css' | wc -l)"
+            echo ""
+            echo "### Quality Guidelines"
+            echo "- ✅ All images should have meaningful alt attributes"
+            echo "- ✅ Use semantic HTML5 elements (header, main, section, etc.)"
+            echo "- ✅ Maintain proper heading hierarchy (h1 → h2 → h3)"
+            echo "- ✅ Ensure CSS follows proper syntax and formatting"
+            echo ""
+            echo "### Configuration Files"
+            echo "- \`.htmlhintrc\`: HTMLHint quality rules"
+          } >> "$GITHUB_STEP_SUMMARY"

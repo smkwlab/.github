@@ -6,7 +6,7 @@
 # Usage:
 #   jobs:
 #     ai-review:
-#       uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@v1.1.0
+#       uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@v1
 #       secrets: inherit
 
 name: AI Reviewer (Reusable)

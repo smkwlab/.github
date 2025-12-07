@@ -6,7 +6,7 @@
 # Usage:
 #   jobs:
 #     ai-review:
-#       uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@v1.1.0
+#       uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@v1
 #       secrets: inherit
 
 name: AI Reviewer (Reusable)
@@ -51,9 +51,9 @@ jobs:
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "::notice::GEMINI_API_KEY is not configured. Skipping AI review."
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Gemini Review Bot

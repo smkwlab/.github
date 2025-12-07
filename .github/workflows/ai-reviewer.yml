@@ -46,8 +46,10 @@ jobs:
     steps:
       - name: Check GEMINI_API_KEY
         id: check-key
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+          if [ -z "$GEMINI_API_KEY" ]; then
             echo "::notice::GEMINI_API_KEY is not configured. Skipping AI review."
             echo "skip=true" >> $GITHUB_OUTPUT
           else

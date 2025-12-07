@@ -44,8 +44,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
+      - name: Check GEMINI_API_KEY
+        id: check-key
+        run: |
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "::notice::GEMINI_API_KEY is not configured. Skipping AI review."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Gemini Review Bot
-        uses: Nasubikun/ai-reviewer@v1
+        if: steps.check-key.outputs.skip != 'true'
+        uses: toshi0806/ai-reviewer@v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

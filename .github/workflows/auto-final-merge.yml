@@ -43,9 +43,10 @@ jobs:
           echo "Checking for approved PR from branch: $BRANCH_NAME"
 
           # Search for approved PR from that branch (to any base branch)
+          # Use head -n 1 to handle multiple matching PRs
           PR_NUMBER=$(gh pr list --state open --head "$BRANCH_NAME" \
             --json number,reviews \
-            --jq '.[] | select(.reviews | map(.state) | contains(["APPROVED"])) | .number')
+            --jq '.[] | select(.reviews | map(.state) | contains(["APPROVED"])) | .number' | head -n 1)
 
           if [ -n "$PR_NUMBER" ]; then
             echo "approved_pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"

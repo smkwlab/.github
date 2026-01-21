@@ -42,10 +42,11 @@ jobs:
 
           echo "Checking for approved PR from branch: $BRANCH_NAME"
 
-          # Search for approved PR from that branch to main
-          PR_NUMBER=$(gh pr list --state open --base main --head "$BRANCH_NAME" \
+          # Search for approved PR from that branch (to any base branch)
+          # Use head -n 1 to handle multiple matching PRs
+          PR_NUMBER=$(gh pr list --state open --head "$BRANCH_NAME" \
             --json number,reviews \
-            --jq '.[] | select(.reviews | map(.state) | contains(["APPROVED"])) | .number')
+            --jq '.[] | select(.reviews | map(.state) | contains(["APPROVED"])) | .number' | head -n 1)
 
           if [ -n "$PR_NUMBER" ]; then
             echo "approved_pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
@@ -53,7 +54,7 @@ jobs:
           else
             echo "::error::No approved PR found for branch $BRANCH_NAME"
             echo "Please ensure:"
-            echo "1. PR from $BRANCH_NAME to main exists"
+            echo "1. PR from $BRANCH_NAME exists"
             echo "2. PR has been approved by faculty"
             exit 1
           fi

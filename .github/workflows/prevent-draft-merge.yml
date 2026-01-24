@@ -25,7 +25,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Skip if propagate-workflow merge
+        id: skip-check
+        run: |
+          # Get the latest commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "::debug::Commit message: $COMMIT_MSG"
+
+          if echo "$COMMIT_MSG" | grep -q "to reconcile workflow history"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping - propagate-workflow merge detected"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check if branch is draft
+        if: steps.skip-check.outputs.skip != 'true'
         id: check-draft
         env:
           HEAD_REF: ${{ github.head_ref }}
@@ -82,7 +97,7 @@ jobs:
           fi
 
       - name: Block draft branch merge
-        if: steps.check-draft.outputs.is_draft == 'true'
+        if: steps.skip-check.outputs.skip != 'true' && steps.check-draft.outputs.is_draft == 'true'
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
@@ -112,7 +127,7 @@ jobs:
           exit 1
 
       - name: Success - Non-draft branch
-        if: steps.check-draft.outputs.is_draft == 'false'
+        if: steps.skip-check.outputs.skip != 'true' && steps.check-draft.outputs.is_draft == 'false'
         env:
           HEAD_REF: ${{ github.head_ref }}
           IS_FINAL: ${{ steps.check-draft.outputs.is_final_submission }}

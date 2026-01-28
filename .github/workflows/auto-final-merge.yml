@@ -53,21 +53,23 @@ jobs:
           fi
 
           # Create PR to main
-          PR_BODY="## Final Submission
+          cat > /tmp/pr_body.md << EOFBODY
+          ## Final Submission
 
-Tag \`$TAG_NAME\` has been applied.
+          Tag $TAG_NAME has been applied.
 
-Please review and merge this PR to complete the final submission.
+          Please review and merge this PR to complete the final submission.
 
-- **Tag**: $TAG_NAME
-- **Source Branch**: $BRANCH_NAME
-- **Commit**: $TAG_COMMIT"
+          - **Tag**: $TAG_NAME
+          - **Source Branch**: $BRANCH_NAME
+          - **Commit**: $TAG_COMMIT
+          EOFBODY
 
           PR_URL=$(gh pr create \
             --base main \
             --head "$BRANCH_NAME" \
             --title "Final Submission: $TAG_NAME" \
-            --body "$PR_BODY")
+            --body-file /tmp/pr_body.md)
 
           echo "Created PR: $PR_URL"
           echo "Please review and merge the PR to complete the final submission."

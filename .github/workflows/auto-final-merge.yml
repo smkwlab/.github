@@ -34,7 +34,7 @@ jobs:
           TAG_COMMIT=$(git rev-parse HEAD)
 
           # Get the branch name where the tag was pushed
-          BRANCH_NAME=$(git branch -r --contains "$TAG_COMMIT" | grep -v HEAD | grep -v main | head -1 | sed 's/origin\///' | xargs)
+          BRANCH_NAME=$(git branch -r --contains "$TAG_COMMIT" | grep -v HEAD | grep -vE '^\s*origin/main$' | head -1 | sed 's/origin\///' | xargs)
 
           if [ -z "$BRANCH_NAME" ]; then
             echo "::error::Cannot determine source branch for tag $TAG_NAME"
@@ -58,17 +58,17 @@ jobs:
             --head "$BRANCH_NAME" \
             --title "Final Submission: $TAG_NAME" \
             --body "$(cat <<EOF
-          ## 最終提出
+## 最終提出
 
-          タグ \`$TAG_NAME\` が付与されました。
+タグ \`$TAG_NAME\` が付与されました。
 
-          このPRをレビューし、問題なければマージしてください。
+このPRをレビューし、問題なければマージしてください。
 
-          - **タグ**: $TAG_NAME
-          - **ソースブランチ**: $BRANCH_NAME
-          - **コミット**: $TAG_COMMIT
-          EOF
-          )")
+- **タグ**: $TAG_NAME
+- **ソースブランチ**: $BRANCH_NAME
+- **コミット**: $TAG_COMMIT
+EOF
+)")
 
           echo "Created PR: $PR_URL"
           echo "Please review and merge the PR to complete the final submission."

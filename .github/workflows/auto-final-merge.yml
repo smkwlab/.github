@@ -53,22 +53,21 @@ jobs:
           fi
 
           # Create PR to main
+          PR_BODY="## Final Submission
+
+Tag \`$TAG_NAME\` has been applied.
+
+Please review and merge this PR to complete the final submission.
+
+- **Tag**: $TAG_NAME
+- **Source Branch**: $BRANCH_NAME
+- **Commit**: $TAG_COMMIT"
+
           PR_URL=$(gh pr create \
             --base main \
             --head "$BRANCH_NAME" \
             --title "Final Submission: $TAG_NAME" \
-            --body "$(cat <<EOF
-## 最終提出
-
-タグ \`$TAG_NAME\` が付与されました。
-
-このPRをレビューし、問題なければマージしてください。
-
-- **タグ**: $TAG_NAME
-- **ソースブランチ**: $BRANCH_NAME
-- **コミット**: $TAG_COMMIT
-EOF
-)")
+            --body "$PR_BODY")
 
           echo "Created PR: $PR_URL"
           echo "Please review and merge the PR to complete the final submission."

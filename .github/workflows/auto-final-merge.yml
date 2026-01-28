@@ -1,14 +1,14 @@
 ---
-# Reusable Workflow: Auto Final Merge
+# Reusable Workflow: Create Final PR to Main
 #
-# This workflow automatically merges approved PRs when a final-* tag is pushed.
+# This workflow creates a PR to merge the final-tagged commit to main.
 # Use this from other repositories with:
 #
 #   jobs:
-#     auto-merge:
-#       uses: smkwlab/.github/.github/workflows/auto-final-merge.yml@main
+#     create-final-pr:
+#       uses: smkwlab/.github/.github/workflows/auto-final-merge.yml@v1
 #
-name: Auto Final Merge
+name: Create Final PR to Main
 
 on:
   workflow_call:
@@ -18,7 +18,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  auto-merge-to-main:
+  create-pr-to-main:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -26,58 +26,49 @@ jobs:
           fetch-depth: 0
           token: ${{ github.token }}
 
-      - name: Find approved PR for this branch
-        id: find-pr
+      - name: Create PR to main
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Identify the branch where the tag was pushed
+          TAG_NAME=${GITHUB_REF#refs/tags/}
           TAG_COMMIT=$(git rev-parse HEAD)
-          BRANCH_NAME=$(git branch -r --contains "$TAG_COMMIT" | grep -v HEAD | head -1 | sed 's/origin\///' | xargs)
+
+          # Get the branch name where the tag was pushed
+          BRANCH_NAME=$(git branch -r --contains "$TAG_COMMIT" | grep -v HEAD | grep -v main | head -1 | sed 's/origin\///' | xargs)
 
           if [ -z "$BRANCH_NAME" ]; then
-            echo "::error::Cannot determine branch for this tag"
+            echo "::error::Cannot determine source branch for tag $TAG_NAME"
             exit 1
           fi
 
-          echo "Checking for approved PR from branch: $BRANCH_NAME"
+          echo "Creating PR from $BRANCH_NAME to main for tag $TAG_NAME"
 
-          # Search for approved PR from that branch (to any base branch)
-          # Use head -n 1 to handle multiple matching PRs
-          PR_NUMBER=$(gh pr list --state open --head "$BRANCH_NAME" \
-            --json number,reviews \
-            --jq '.[] | select(.reviews | map(.state) | contains(["APPROVED"])) | .number' | head -n 1)
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base main --state open --json number --jq '.[0].number')
 
-          if [ -n "$PR_NUMBER" ]; then
-            echo "approved_pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-            echo "Found approved PR #$PR_NUMBER from branch $BRANCH_NAME"
-          else
-            echo "::error::No approved PR found for branch $BRANCH_NAME"
-            echo "Please ensure:"
-            echo "1. PR from $BRANCH_NAME exists"
-            echo "2. PR has been approved by faculty"
-            exit 1
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists from $BRANCH_NAME to main"
+            echo "Please review and merge the existing PR."
+            exit 0
           fi
 
-      - name: Auto merge approved PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          PR_NUMBER=${{ steps.find-pr.outputs.approved_pr }}
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-
-          # Auto-merge the PR
-          gh pr merge "$PR_NUMBER" --merge --delete-branch
-
-          echo "Automatically merged PR #$PR_NUMBER to main"
-          echo "Final submission complete with tag: $TAG_NAME"
-
-      - name: Create release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          gh release create "$TAG_NAME" \
+          # Create PR to main
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "$BRANCH_NAME" \
             --title "Final Submission: $TAG_NAME" \
-            --notes "Auto-created for final submission. Tag: $TAG_NAME, Date: $(date)" \
-            --latest
+            --body "$(cat <<EOF
+          ## 最終提出
+
+          タグ \`$TAG_NAME\` が付与されました。
+
+          このPRをレビューし、問題なければマージしてください。
+
+          - **タグ**: $TAG_NAME
+          - **ソースブランチ**: $BRANCH_NAME
+          - **コミット**: $TAG_COMMIT
+          EOF
+          )")
+
+          echo "Created PR: $PR_URL"
+          echo "Please review and merge the PR to complete the final submission."

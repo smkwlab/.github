@@ -26,6 +26,11 @@ on:
         default: 30
         required: false
         type: number
+      auto-merge:
+        description: 'Enable auto-merge when tests and format pass'
+        default: true
+        required: false
+        type: boolean
 
 permissions:
   contents: write
@@ -115,13 +120,7 @@ jobs:
           ## Test Results
           - Tests: ${{ steps.test_run.outcome }}
           - Format: ${{ steps.format_check.outcome }}
-
-          Please review the changes and ensure all tests pass before merging.
-
-          ### Checklist
-          - [ ] All tests pass
-          - [ ] No breaking changes in dependencies
-          - [ ] Security advisories addressed (if any)
+          - Auto-merge: ${{ inputs.auto-merge && steps.test_run.outcome == 'success' && steps.format_check.outcome == 'success' && 'enabled' || 'disabled (manual review required)' }}
         branch: dependency-update-${{ github.run_number }}
         delete-branch: true
         labels: |
@@ -130,11 +129,14 @@ jobs:
 
     - name: Enable auto-merge
       if: >-
+        inputs.auto-merge &&
         steps.create_pr.outputs.pull-request-number &&
         steps.test_run.outcome == 'success' &&
         steps.format_check.outcome == 'success'
+      continue-on-error: true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        echo "Enabling auto-merge for PR #${{ steps.create_pr.outputs.pull-request-number }}"
         gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} \
           --auto --merge

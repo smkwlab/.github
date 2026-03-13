@@ -5,7 +5,7 @@
 #     dependency-update:
 #       uses: smkwlab/.github/.github/workflows/dependency-update.yml@v1
 #       with:
-#         auto-merge: true  # optional: auto-merge when tests pass
+#         auto_merge: true  # optional: auto-merge when tests pass
 #       secrets: inherit
 
 name: Dependency Update (Reusable)
@@ -28,12 +28,12 @@ on:
         default: 30
         required: false
         type: number
-      auto-merge:
+      auto_merge:
         description: 'Enable auto-merge when tests and format pass (requires allow_auto_merge repo setting)'
         default: false
         required: false
         type: boolean
-      merge-method:
+      merge_method:
         description: 'Merge method for auto-merge (merge, squash, or rebase)'
         default: 'merge'
         required: false
@@ -127,27 +127,41 @@ jobs:
           ## Test Results
           - Tests: ${{ steps.test_run.outcome }}
           - Format: ${{ steps.format_check.outcome }}
-          - Auto-merge: ${{ !inputs.auto-merge && 'disabled' || (steps.test_run.outcome != 'success' || steps.format_check.outcome != 'success') && 'skipped (checks failed)' || 'requested' }}
+          - Auto-merge: ${{ !inputs.auto_merge && 'disabled' || (steps.test_run.outcome != 'success' || steps.format_check.outcome != 'success') && 'skipped (checks failed)' || 'requested' }}
         branch: dependency-update-${{ github.run_number }}
         delete-branch: true
         labels: |
           dependencies
           automated
 
-    - name: Enable auto-merge
-      id: auto_merge
+    - name: Validate merge method
+      id: validate_merge
       if: >-
-        inputs.auto-merge &&
+        inputs.auto_merge &&
         steps.create_pr.outputs.pull-request-number &&
         steps.test_run.outcome == 'success' &&
         steps.format_check.outcome == 'success'
+      run: |
+        case "${{ inputs.merge_method }}" in
+          merge|squash|rebase)
+            echo "method=${{ inputs.merge_method }}" >> "$GITHUB_OUTPUT"
+            ;;
+          *)
+            echo "::error::Invalid merge method: ${{ inputs.merge_method }}. Must be merge, squash, or rebase."
+            exit 1
+            ;;
+        esac
+
+    - name: Enable auto-merge
+      id: auto_merge
+      if: steps.validate_merge.outcome == 'success'
       continue-on-error: true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "Enabling auto-merge for PR #${{ steps.create_pr.outputs.pull-request-number }}"
         gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} \
-          --auto --${{ inputs.merge-method }}
+          --auto --delete-branch --${{ steps.validate_merge.outputs.method }}
 
     - name: Warn if auto-merge failed
       if: steps.auto_merge.outcome == 'failure'

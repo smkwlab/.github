@@ -100,6 +100,7 @@ jobs:
         fi
 
     - name: Create Pull Request
+      id: create_pr
       if: steps.check_changes.outputs.changes == 'true'
       uses: peter-evans/create-pull-request@v7
       with:
@@ -126,3 +127,14 @@ jobs:
         labels: |
           dependencies
           automated
+
+    - name: Enable auto-merge
+      if: >-
+        steps.create_pr.outputs.pull-request-number &&
+        steps.test_run.outcome == 'success' &&
+        steps.format_check.outcome == 'success'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} \
+          --auto --merge

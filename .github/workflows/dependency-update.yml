@@ -29,8 +29,10 @@ on:
         required: false
         type: number
       # NOTE: snake_case is intentional for auto_merge and merge_method.
-      # Hyphens in input names are interpreted as subtraction in GitHub Actions
-      # `if:` expressions (e.g., inputs.auto-merge → inputs.auto minus merge).
+      # These inputs are used in `if:` expressions where hyphens are parsed
+      # as the subtraction operator (e.g., inputs.auto-merge → inputs.auto minus merge).
+      # The existing kebab-case inputs (otp-version, etc.) are only used in
+      # `with:` / `${{ }}` string interpolation contexts where hyphens are safe.
       auto_merge:
         description: 'Enable auto-merge when tests and format pass (requires "Allow auto-merge" in repo Settings > General)'
         default: false
@@ -164,6 +166,7 @@ jobs:
         PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
         MERGE_METHOD: ${{ steps.validate_merge.outputs.method }}
       run: |
+        set -o pipefail
         echo "Enabling auto-merge for PR #${PR_NUMBER}"
         gh pr merge "${PR_NUMBER}" \
           --auto --delete-branch "--${MERGE_METHOD}" 2>&1 | tee /tmp/auto-merge-output.txt
@@ -173,25 +176,22 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
+        MERGE_METHOD: ${{ steps.validate_merge.outputs.method }}
       run: |
         if [ "${{ steps.auto_merge.outcome }}" = "success" ]; then
           gh pr comment "${PR_NUMBER}" --body "Auto-merge has been enabled successfully."
         else
           ERROR_OUTPUT=$(cat /tmp/auto-merge-output.txt 2>/dev/null || echo "unknown error")
-          gh pr comment "${PR_NUMBER}" --body "$(cat <<EOFCOMMENT
-        ⚠️ Auto-merge could not be enabled.
-
-        **Possible causes:**
-        - \"Allow auto-merge\" is not enabled in repository Settings > General
-        - The merge method (${MERGE_METHOD:-merge}) is not allowed by repository settings
-        - Insufficient token permissions
-        - Branch protection rules are blocking auto-merge
-
-        **Error output:**
-        \`\`\`
-        ${ERROR_OUTPUT}
-        \`\`\`
-        EOFCOMMENT
-          )"
+          BODY="⚠️ Auto-merge could not be enabled."
+          BODY="${BODY}"$'\n\n'"**Possible causes:**"
+          BODY="${BODY}"$'\n'"- \"Allow auto-merge\" is not enabled in repository Settings > General"
+          BODY="${BODY}"$'\n'"- The merge method (${MERGE_METHOD}) is not allowed by repository settings"
+          BODY="${BODY}"$'\n'"- Insufficient token permissions"
+          BODY="${BODY}"$'\n'"- Branch protection rules are blocking auto-merge"
+          BODY="${BODY}"$'\n\n'"**Error output:**"
+          BODY="${BODY}"$'\n'"\`\`\`"
+          BODY="${BODY}"$'\n'"${ERROR_OUTPUT}"
+          BODY="${BODY}"$'\n'"\`\`\`"
+          gh pr comment "${PR_NUMBER}" --body "${BODY}"
           echo "::warning::Auto-merge could not be enabled. See PR comment for details."
         fi

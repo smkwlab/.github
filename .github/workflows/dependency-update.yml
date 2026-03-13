@@ -28,8 +28,11 @@ on:
         default: 30
         required: false
         type: number
+      # NOTE: snake_case is intentional for auto_merge and merge_method.
+      # Hyphens in input names are interpreted as subtraction in GitHub Actions
+      # `if:` expressions (e.g., inputs.auto-merge → inputs.auto minus merge).
       auto_merge:
-        description: 'Enable auto-merge when tests and format pass (requires allow_auto_merge repo setting)'
+        description: 'Enable auto-merge when tests and format pass (requires "Allow auto-merge" in repo Settings > General)'
         default: false
         required: false
         type: boolean
@@ -127,7 +130,7 @@ jobs:
           ## Test Results
           - Tests: ${{ steps.test_run.outcome }}
           - Format: ${{ steps.format_check.outcome }}
-          - Auto-merge: ${{ !inputs.auto_merge && 'disabled' || (steps.test_run.outcome != 'success' || steps.format_check.outcome != 'success') && 'skipped (checks failed)' || 'requested' }}
+          - Auto-merge: ${{ !inputs.auto_merge && 'disabled' || (steps.test_run.outcome != 'success' || steps.format_check.outcome != 'success') && 'skipped (checks failed)' || 'pending (will be confirmed by workflow)' }}
         branch: dependency-update-${{ github.run_number }}
         delete-branch: true
         labels: |
@@ -158,12 +161,37 @@ jobs:
       continue-on-error: true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
+        MERGE_METHOD: ${{ steps.validate_merge.outputs.method }}
       run: |
-        echo "Enabling auto-merge for PR #${{ steps.create_pr.outputs.pull-request-number }}"
-        gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} \
-          --auto --delete-branch --${{ steps.validate_merge.outputs.method }}
+        echo "Enabling auto-merge for PR #${PR_NUMBER}"
+        gh pr merge "${PR_NUMBER}" \
+          --auto --delete-branch "--${MERGE_METHOD}" 2>&1 | tee /tmp/auto-merge-output.txt
 
-    - name: Warn if auto-merge failed
-      if: steps.auto_merge.outcome == 'failure'
+    - name: Update PR on auto-merge result
+      if: steps.auto_merge.outcome == 'success' || steps.auto_merge.outcome == 'failure'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
       run: |
-        echo "::warning::Auto-merge could not be enabled. Check that 'Allow auto-merge' is enabled in repository settings."
+        if [ "${{ steps.auto_merge.outcome }}" = "success" ]; then
+          gh pr comment "${PR_NUMBER}" --body "Auto-merge has been enabled successfully."
+        else
+          ERROR_OUTPUT=$(cat /tmp/auto-merge-output.txt 2>/dev/null || echo "unknown error")
+          gh pr comment "${PR_NUMBER}" --body "$(cat <<EOFCOMMENT
+        ⚠️ Auto-merge could not be enabled.
+
+        **Possible causes:**
+        - \"Allow auto-merge\" is not enabled in repository Settings > General
+        - The merge method (${MERGE_METHOD:-merge}) is not allowed by repository settings
+        - Insufficient token permissions
+        - Branch protection rules are blocking auto-merge
+
+        **Error output:**
+        \`\`\`
+        ${ERROR_OUTPUT}
+        \`\`\`
+        EOFCOMMENT
+          )"
+          echo "::warning::Auto-merge could not be enabled. See PR comment for details."
+        fi

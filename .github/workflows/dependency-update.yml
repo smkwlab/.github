@@ -155,7 +155,7 @@ jobs:
       id: validate_merge
       if: >-
         inputs.auto_merge &&
-        steps.create_pr.outputs.pull-request-number &&
+        steps.create_pr.outputs['pull-request-number'] &&
         steps.test_run.outcome == 'success' &&
         steps.format_check.outcome == 'success'
       run: |
@@ -177,7 +177,7 @@ jobs:
       continue-on-error: true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
+        PR_NUMBER: ${{ steps.create_pr.outputs['pull-request-number'] }}
         MERGE_METHOD: ${{ steps.validate_merge.outputs.method }}
       run: |
         set -o pipefail
@@ -189,7 +189,7 @@ jobs:
       if: steps.auto_merge.outcome == 'success' || steps.auto_merge.outcome == 'failure'
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
+        PR_NUMBER: ${{ steps.create_pr.outputs['pull-request-number'] }}
         MERGE_METHOD: ${{ steps.validate_merge.outputs.method }}
       run: |
         if [ "${{ steps.auto_merge.outcome }}" = "success" ]; then

@@ -116,12 +116,28 @@ jobs:
           } >> "$GITHUB_ENV"
         fi
 
+    - name: Validate merge method
+      id: validate_merge
+      if: inputs.auto_merge
+      run: |
+        case "${{ inputs.merge_method }}" in
+          merge|squash|rebase)
+            echo "method=${{ inputs.merge_method }}" >> "$GITHUB_OUTPUT"
+            ;;
+          *)
+            echo "::error::Invalid merge method: ${{ inputs.merge_method }}. Must be merge, squash, or rebase."
+            exit 1
+            ;;
+        esac
+
     - name: Determine auto-merge status
       id: auto_merge_status
       if: steps.check_changes.outputs.changes == 'true'
       run: |
         if [ "${{ inputs.auto_merge }}" != "true" ]; then
           echo "label=disabled" >> "$GITHUB_OUTPUT"
+        elif [ "${{ steps.validate_merge.outcome }}" = "failure" ]; then
+          echo "label=skipped (invalid merge method)" >> "$GITHUB_OUTPUT"
         elif [ "${{ steps.test_run.outcome }}" != "success" ] || [ "${{ steps.format_check.outcome }}" != "success" ]; then
           echo "label=skipped (checks failed)" >> "$GITHUB_OUTPUT"
         else
@@ -151,27 +167,13 @@ jobs:
           dependencies
           automated
 
-    - name: Validate merge method
-      id: validate_merge
+    - name: Enable auto-merge
+      id: auto_merge
       if: >-
-        inputs.auto_merge &&
+        steps.validate_merge.outcome == 'success' &&
         steps.create_pr.outputs['pull-request-number'] &&
         steps.test_run.outcome == 'success' &&
         steps.format_check.outcome == 'success'
-      run: |
-        case "${{ inputs.merge_method }}" in
-          merge|squash|rebase)
-            echo "method=${{ inputs.merge_method }}" >> "$GITHUB_OUTPUT"
-            ;;
-          *)
-            echo "::error::Invalid merge method: ${{ inputs.merge_method }}. Must be merge, squash, or rebase."
-            exit 1
-            ;;
-        esac
-
-    - name: Enable auto-merge
-      id: auto_merge
-      if: steps.validate_merge.outcome == 'success'
       # continue-on-error: PR creation already succeeded; auto-merge failure
       # is reported via PR comment, not by failing the entire workflow.
       continue-on-error: true

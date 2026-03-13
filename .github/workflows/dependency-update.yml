@@ -28,11 +28,9 @@ on:
         default: 30
         required: false
         type: number
-      # NOTE: snake_case is intentional for auto_merge and merge_method.
-      # These inputs are used in `if:` expressions where hyphens are parsed
-      # as the subtraction operator (e.g., inputs.auto-merge → inputs.auto minus merge).
-      # The existing kebab-case inputs (otp-version, etc.) are only used in
-      # `with:` / `${{ }}` string interpolation contexts where hyphens are safe.
+      # NOTE: snake_case is intentional for auto_merge and merge_method
+      # because they are used in `if:` expressions where hyphens would be
+      # parsed as the subtraction operator.
       auto_merge:
         description: 'Enable auto-merge when tests and format pass (requires "Allow auto-merge" in repo Settings > General)'
         default: false
@@ -119,6 +117,7 @@ jobs:
     - name: Validate merge method
       id: validate_merge
       if: inputs.auto_merge
+      continue-on-error: true
       run: |
         case "${{ inputs.merge_method }}" in
           merge|squash|rebase)

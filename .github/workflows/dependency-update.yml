@@ -3,7 +3,9 @@
 # Usage:
 #   jobs:
 #     dependency-update:
-#       uses: smkwlab/.github/.github/workflows/dependency-update.yml@v1.1.0
+#       uses: smkwlab/.github/.github/workflows/dependency-update.yml@v1
+#       with:
+#         auto_merge: true  # optional: auto-merge when tests pass
 #       secrets: inherit
 
 name: Dependency Update (Reusable)
@@ -26,6 +28,19 @@ on:
         default: 30
         required: false
         type: number
+      # NOTE: snake_case is intentional for auto_merge and merge_method
+      # because they are used in `if:` expressions where hyphens would be
+      # parsed as the subtraction operator.
+      auto_merge:
+        description: 'Enable auto-merge when tests and format pass (requires "Allow auto-merge" in repo Settings > General)'
+        default: false
+        required: false
+        type: boolean
+      merge_method:
+        description: 'Merge method for auto-merge (merge, squash, or rebase)'
+        default: 'merge'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -99,7 +114,37 @@ jobs:
           } >> "$GITHUB_ENV"
         fi
 
+    - name: Validate merge method
+      id: validate_merge
+      if: inputs.auto_merge
+      continue-on-error: true
+      run: |
+        case "${{ inputs.merge_method }}" in
+          merge|squash|rebase)
+            echo "method=${{ inputs.merge_method }}" >> "$GITHUB_OUTPUT"
+            ;;
+          *)
+            echo "::error::Invalid merge method: ${{ inputs.merge_method }}. Must be merge, squash, or rebase."
+            exit 1
+            ;;
+        esac
+
+    - name: Determine auto-merge status
+      id: auto_merge_status
+      if: steps.check_changes.outputs.changes == 'true'
+      run: |
+        if [ "${{ inputs.auto_merge }}" != "true" ]; then
+          echo "label=disabled" >> "$GITHUB_OUTPUT"
+        elif [ "${{ steps.validate_merge.outcome }}" = "failure" ]; then
+          echo "label=skipped (invalid merge method)" >> "$GITHUB_OUTPUT"
+        elif [ "${{ steps.test_run.outcome }}" != "success" ] || [ "${{ steps.format_check.outcome }}" != "success" ]; then
+          echo "label=skipped (checks failed)" >> "$GITHUB_OUTPUT"
+        else
+          echo "label=pending (will be confirmed by workflow)" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Create Pull Request
+      id: create_pr
       if: steps.check_changes.outputs.changes == 'true'
       uses: peter-evans/create-pull-request@v7
       with:
@@ -114,15 +159,54 @@ jobs:
           ## Test Results
           - Tests: ${{ steps.test_run.outcome }}
           - Format: ${{ steps.format_check.outcome }}
-
-          Please review the changes and ensure all tests pass before merging.
-
-          ### Checklist
-          - [ ] All tests pass
-          - [ ] No breaking changes in dependencies
-          - [ ] Security advisories addressed (if any)
+          - Auto-merge: ${{ steps.auto_merge_status.outputs.label }}
         branch: dependency-update-${{ github.run_number }}
         delete-branch: true
         labels: |
           dependencies
           automated
+
+    - name: Enable auto-merge
+      id: auto_merge
+      if: >-
+        steps.validate_merge.outcome == 'success' &&
+        steps.create_pr.outputs['pull-request-number'] &&
+        steps.test_run.outcome == 'success' &&
+        steps.format_check.outcome == 'success'
+      # continue-on-error: PR creation already succeeded; auto-merge failure
+      # is reported via PR comment, not by failing the entire workflow.
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PR_NUMBER: ${{ steps.create_pr.outputs['pull-request-number'] }}
+        MERGE_METHOD: ${{ steps.validate_merge.outputs.method }}
+      run: |
+        set -o pipefail
+        echo "Enabling auto-merge for PR #${PR_NUMBER}"
+        gh pr merge "${PR_NUMBER}" \
+          --auto --delete-branch "--${MERGE_METHOD}" 2>&1 | tee /tmp/auto-merge-output.txt
+
+    - name: Update PR on auto-merge result
+      if: steps.auto_merge.outcome == 'success' || steps.auto_merge.outcome == 'failure'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PR_NUMBER: ${{ steps.create_pr.outputs['pull-request-number'] }}
+        MERGE_METHOD: ${{ steps.validate_merge.outputs.method }}
+      run: |
+        if [ "${{ steps.auto_merge.outcome }}" = "success" ]; then
+          gh pr comment "${PR_NUMBER}" --body "Auto-merge has been enabled successfully."
+        else
+          ERROR_OUTPUT=$(cat /tmp/auto-merge-output.txt 2>/dev/null || echo "unknown error")
+          BODY="⚠️ Auto-merge could not be enabled."
+          BODY="${BODY}"$'\n\n'"**Possible causes:**"
+          BODY="${BODY}"$'\n'"- \"Allow auto-merge\" is not enabled in repository Settings > General"
+          BODY="${BODY}"$'\n'"- The merge method (${MERGE_METHOD}) is not allowed by repository settings"
+          BODY="${BODY}"$'\n'"- Insufficient token permissions"
+          BODY="${BODY}"$'\n'"- Branch protection rules are blocking auto-merge"
+          BODY="${BODY}"$'\n\n'"**Error output:**"
+          BODY="${BODY}"$'\n'"\`\`\`"
+          BODY="${BODY}"$'\n'"${ERROR_OUTPUT}"
+          BODY="${BODY}"$'\n'"\`\`\`"
+          gh pr comment "${PR_NUMBER}" --body "${BODY}"
+          echo "::warning::Auto-merge could not be enabled. See PR comment for details."
+        fi

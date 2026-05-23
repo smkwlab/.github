@@ -39,8 +39,9 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | Workflow | 説明 | 用途 |
 |----------|------|------|
 | `elixir-ci.yml` | Elixir プロジェクト向け CI | Elixir プロジェクト |
-| `dependency-update.yml` | 依存関係の自動更新 PR 作成 | Elixir プロジェクト |
 | `security.yml` | 依存関係監査・シークレットスキャン | Elixir プロジェクト |
+
+依存関係の自動更新は Renovate Bot に一元化しました（各リポジトリの `renovate.json` を参照）。
 
 ## 使い方
 
@@ -183,17 +184,6 @@ Elixir プロジェクト向けの CI ワークフローです。LTS と最新�
 | `dialyzer-enabled` | No | `true` | Dialyzer 静的解析を有効化 |
 | `timeout-minutes` | No | `15` | ジョブタイムアウト（分） |
 | `dialyzer-timeout-minutes` | No | `20` | Dialyzer タイムアウト（分） |
-
-### dependency-update.yml
-
-Elixir 依存関係を自動更新し、PR を作成します。
-
-**入力パラメータ:**
-| パラメータ | 必須 | デフォルト | 説明 |
-|-----------|:----:|-----------|------|
-| `otp-version` | No | `28.2` | OTP バージョン |
-| `elixir-version` | No | `1.19.4` | Elixir バージョン |
-| `timeout-minutes` | No | `30` | タイムアウト（分） |
 
 ### security.yml
 

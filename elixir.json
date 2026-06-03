@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>smkwlab/.github"],
+  "enabledManagers": ["mix"],
+  "schedule": ["before 6am on monday"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Intentional exception to the org-wide patch/digest-only auto-merge policy: Elixir (hex) packages are reliably semver-compliant, so minor and lockFileMaintenance updates are grouped and auto-merged as well. This preserves the pre-existing behavior of the Elixir repositories.",
+      "matchManagers": ["mix"],
+      "matchDatasources": ["hex"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
+      "groupName": "elixir dependencies",
+      "automerge": true,
+      "platformAutomerge": true
+    }
+  ]
+}

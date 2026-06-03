@@ -1,0 +1,16 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Asia/Tokyo",
+  "dependencyDashboard": true,
+  "dependencyDashboardLabels": ["dependencies"],
+  "semanticCommits": "enabled",
+  "packageRules": [
+    {
+      "description": "Auto-merge only patch and digest updates that pass CI",
+      "matchUpdateTypes": ["patch", "digest", "pinDigest"],
+      "automerge": true,
+      "platformAutomerge": true
+    }
+  ]
+}

@@ -9,7 +9,7 @@
   },
   "packageRules": [
     {
-      "description": "Group Elixir (hex) minor/patch/digest updates and auto-merge",
+      "description": "Intentional exception to the org-wide patch/digest-only auto-merge policy: Elixir (hex) packages are reliably semver-compliant, so minor and lockFileMaintenance updates are grouped and auto-merged as well. This preserves the pre-existing behavior of the Elixir repositories.",
       "matchManagers": ["mix"],
       "matchDatasources": ["hex"],
       "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],

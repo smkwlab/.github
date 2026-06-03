@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>smkwlab/.github", "workarounds:all"],
+  "schedule": ["after 9pm on sunday"],
+  "packageRules": [
+    {
+      "description": "GitHub Actions version updates",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "labels": ["dependencies", "github-actions"],
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "Docker base image updates",
+      "matchManagers": ["dockerfile"],
+      "pinDigests": true,
+      "labels": ["dependencies", "docker"],
+      "semanticCommitType": "build"
+    },
+    {
+      "description": "npm dependency updates",
+      "matchManagers": ["npm"],
+      "rangeStrategy": "bump",
+      "labels": ["dependencies", "npm"],
+      "semanticCommitType": "chore"
+    }
+  ]
+}

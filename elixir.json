@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>smkwlab/.github"],
+  "enabledManagers": ["mix"],
+  "schedule": ["before 6am on monday"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Group Elixir (hex) minor/patch/digest updates and auto-merge",
+      "matchManagers": ["mix"],
+      "matchDatasources": ["hex"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
+      "groupName": "elixir dependencies",
+      "automerge": true,
+      "platformAutomerge": true
+    }
+  ]
+}

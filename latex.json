@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>smkwlab/.github", "workarounds:all"],
+  "extends": ["github>smkwlab/.github#v1", "workarounds:all"],
   "schedule": ["after 9pm on sunday"],
   "packageRules": [
     {

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "packageRules": [
+    {
+      "description": "Group and auto-merge npm minor/patch/digest updates that pass CI",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
+      "groupName": "npm dependencies",
+      "automerge": true,
+      "platformAutomerge": true
+    }
+  ]
+}

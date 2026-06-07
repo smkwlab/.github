@@ -1,0 +1,92 @@
+# Reusable Claude Code Review Workflow
+#
+# Runs an automated PR review with Claude Code Action. Designed as the shared
+# org-wide review workflow to avoid GitHub Copilot premium request quota limits.
+#
+# Authentication uses a Console-issued ANTHROPIC_API_KEY (metered billing),
+# NOT a Claude Max OAuth token (subscription tokens are for personal use and
+# are not suitable for reviewing other people's PRs across repositories).
+#
+# Required secrets:
+#   - anthropic_api_key: Console-issued Anthropic API key (passed from caller)
+#
+# Usage (caller in each target repository):
+#   on:
+#     pull_request:
+#       types: [opened, synchronize, reopened]
+#   jobs:
+#     review:
+#       uses: smkwlab/.github/.github/workflows/claude-code-review.yml@v1
+#       permissions:
+#         contents: read
+#         pull-requests: write
+#         issues: write
+#       secrets:
+#         anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+#       with:
+#         model: sonnet          # opus for important repos (thesis, etc.)
+#         review_language: 日本語
+
+name: Claude Code Review (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: "使用モデル（sonnet / opus / haiku）"
+        type: string
+        required: false
+        default: "sonnet"
+      review_language:
+        description: "レビューコメントの言語"
+        type: string
+        required: false
+        default: "日本語"
+    secrets:
+      anthropic_api_key:
+        description: "Anthropic API key（caller から渡す）"
+        required: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    # Skip drafts. Fork PRs receive no secrets, so the key check below skips
+    # them gracefully instead of failing.
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Check ANTHROPIC_API_KEY
+        id: check-key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic_api_key }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice::ANTHROPIC_API_KEY is not configured (or unavailable on fork PRs). Skipping Claude review."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.check-key.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Review
+        if: steps.check-key.outputs.skip != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.anthropic_api_key }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          claude_args: "--model ${{ inputs.model }}"
+          prompt: |
+            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+
+            レビューコメントはすべて${{ inputs.review_language }}で記述してください。
+            各指摘には重大度（critical / warning / nit）のラベルを付けてください。
+            スタイルの好みより、バグ・セキュリティ・ロジックの問題を優先してください。

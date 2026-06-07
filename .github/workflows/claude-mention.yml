@@ -1,0 +1,101 @@
+# Reusable Claude Mention Workflow
+#
+# Interactive @claude handler: a user mentions @claude in an issue comment, PR
+# comment, or new issue to ask a question or request a fix. Claude replies and
+# (for fix requests) can commit changes to the PR branch.
+#
+# This is separate from the review workflow (claude-code-review.yml): review is
+# automatic on PR open, this is on-demand via the @claude trigger phrase.
+#
+# Authentication uses a Console-issued ANTHROPIC_API_KEY (metered billing).
+#
+# Required secrets:
+#   - anthropic_api_key: Console-issued Anthropic API key (passed from caller)
+#
+# Usage (caller in each target repository). Filter the @claude mention AND the
+# author's permission in the CALLER's job `if:` (see claude-mention-self.yml):
+#   on:
+#     issue_comment:
+#       types: [created]
+#     pull_request_review_comment:
+#       types: [created]
+#     issues:
+#       types: [opened]
+#   jobs:
+#     claude:
+#       if: <@claude present AND author_association in OWNER/MEMBER/COLLABORATOR>
+#       uses: smkwlab/.github/.github/workflows/claude-mention.yml@v1
+#       permissions:
+#         contents: write
+#         pull-requests: write
+#         issues: write
+#         id-token: write
+#       secrets:
+#         anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+#       with:
+#         model: sonnet
+
+name: Claude Mention (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: "使用モデル（sonnet / opus / haiku）"
+        type: string
+        required: false
+        default: "sonnet"
+      language:
+        description: "応答の言語"
+        type: string
+        required: false
+        default: "日本語"
+      timeout_minutes:
+        description: "ジョブのタイムアウト（分）。対話セッションの暴走/課金を防ぐ"
+        type: number
+        required: false
+        default: 20
+    secrets:
+      anthropic_api_key:
+        description: "Anthropic API key（caller から渡す）"
+        required: true
+
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    permissions:
+      contents: write        # @claude の修正依頼で PR ブランチへコミットするため
+      pull-requests: write
+      issues: write
+      id-token: write        # required by claude-code-action for OIDC
+    steps:
+      - name: Check ANTHROPIC_API_KEY
+        id: check-key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic_api_key }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice::ANTHROPIC_API_KEY is not configured (or unavailable on fork PRs). Skipping @claude."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.check-key.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude
+        if: steps.check-key.outputs.skip != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.anthropic_api_key }}
+          # Tag mode: no `prompt` — the @claude comment body becomes the instruction.
+          trigger_phrase: "@claude"
+          claude_args: |
+            --model ${{ inputs.model }}
+            --max-turns 30
+            --append-system-prompt "応答はすべて${{ inputs.language }}で記述してください。コードを修正する場合はリポジトリの CLAUDE.md と既存コードの慣習に従ってください。"

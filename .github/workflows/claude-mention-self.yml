@@ -1,0 +1,44 @@
+# Claude Mention — caller for this (.github) repository itself.
+#
+# Interactive @claude handler. References the reusable by local path so this
+# repo's own issues/PRs can use @claude without waiting for a tag.
+#
+# Comment-triggered workflows run from the DEFAULT branch, so this must be on
+# the default branch to take effect.
+
+name: Claude Mention
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened]
+
+jobs:
+  claude:
+    # Run only when @claude is mentioned AND the author has repository access.
+    # The author_association guard prevents random/external users from
+    # triggering a contents:write session. Fork PRs receive no secret anyway.
+    if: >
+      (github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'issues' &&
+        contains(github.event.issue.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+    uses: ./.github/workflows/claude-mention.yml
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    secrets:
+      anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    with:
+      model: sonnet
+      language: 日本語

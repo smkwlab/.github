@@ -188,7 +188,7 @@ Claude Code Action を使用して PR の自動レビューを行います。Git
 **必要な権限:** caller 側のジョブに `id-token: write`（claude-code-action の OIDC 認証で必須）に加え、`contents: read` / `pull-requests: write` / `issues: write`。
 
 **挙動:**
-- draft PR はスキップ（`ready_for_review` で起動）
+- draft PR は `ready_for_review` になるまでレビューをスキップ（`opened` / `synchronize` 時点では実行しない）
 - fork PR では secret が渡らないため安全にスキップ
 - ワークフローファイルは default ブランチに存在する必要がある（claude-code-action のセキュリティ検証）
 

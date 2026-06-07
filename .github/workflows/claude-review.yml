@@ -25,6 +25,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      id-token: write  # required by claude-code-action for OIDC
     secrets:
       anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
     with:

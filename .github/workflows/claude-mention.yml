@@ -60,6 +60,14 @@ on:
         description: "Anthropic API key（caller から渡す）"
         required: true
 
+# Serialize @claude sessions per conversation. cancel-in-progress: false (unlike
+# the review workflow) so an in-flight fix is never killed mid-commit and no two
+# sessions push to the same PR branch concurrently; overlapping requests queue.
+# Evaluated against the caller's inherited event, so every caller benefits.
+concurrency:
+  group: claude-mention-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   claude:
     runs-on: ubuntu-latest

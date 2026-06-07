@@ -13,7 +13,7 @@
 # Usage (caller in each target repository):
 #   on:
 #     pull_request:
-#       types: [opened, synchronize, reopened]
+#       types: [opened, synchronize, reopened, ready_for_review]
 #   jobs:
 #     review:
 #       uses: smkwlab/.github/.github/workflows/claude-code-review.yml@v1
@@ -43,6 +43,11 @@ on:
         type: string
         required: false
         default: "日本語"
+      timeout_minutes:
+        description: "ジョブのタイムアウト（分）。レビューがハングした際の課金/runner 暴走を防ぐ"
+        type: number
+        required: false
+        default: 15
     secrets:
       anthropic_api_key:
         description: "Anthropic API key（caller から渡す）"
@@ -51,8 +56,11 @@ on:
 jobs:
   review:
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     # Skip drafts. Fork PRs receive no secrets, so the key check below skips
     # them gracefully instead of failing.
+    # NOTE: meant to be called from a pull_request event — the draft guard
+    # below evaluates to false (and skips) for non-PR events.
     if: github.event.pull_request.draft == false
     permissions:
       contents: read

@@ -1,0 +1,25 @@
+# AI Reviewer (Gemini) — caller for this (.github) repository itself.
+#
+# Other repositories call the reusable workflow via
+#   uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@v1
+# but for self-review we reference the reusable by local path so that each PR
+# is reviewed with its own version of the workflow (no need to wait for a tag).
+#
+# Requires the GEMINI_API_KEY secret. When it is unset (e.g. fork PRs), the
+# reusable workflow skips the review gracefully.
+
+name: AI Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  ai-review:
+    # Skip drafts; review once the PR is ready.
+    if: github.event.pull_request.draft == false
+    uses: ./.github/workflows/ai-reviewer.yml
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets: inherit

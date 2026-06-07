@@ -31,3 +31,4 @@ jobs:
     with:
       model: sonnet
       review_language: 日本語
+      show_full_output: true   # TEMP(debug): permission_denials 調査のため。完了後 false に戻す

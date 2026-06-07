@@ -26,6 +26,7 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | `prevent-draft-merge.yml` | draft ブランチの誤マージを防止 | 卒論・ISE レポート |
 | `auto-final-merge.yml` | final-* タグ push 時に承認済み PR を自動マージ | 卒論テンプレート |
 | `ai-reviewer.yml` | Gemini AI による PR 自動レビュー | 全テンプレート |
+| `claude-code-review.yml` | Claude Code Action による PR 自動レビュー | 全テンプレート（重要リポジトリは `opus`） |
 | `notify-ml-on-pr.yml` | PR 作成時にメーリングリストへ通知 | 卒論・ISE レポート |
 
 ### HTML 関連
@@ -98,6 +99,33 @@ jobs:
     secrets: inherit
 ```
 
+#### Claude レビュー（シークレットを明示的に渡す）
+
+```yaml
+name: Claude Code Review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    uses: smkwlab/.github/.github/workflows/claude-code-review.yml@v1
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    secrets:
+      anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    with:
+      model: sonnet
+      review_language: 日本語
+```
+
 ## ワークフロー詳細
 
 ### latex-build.yml
@@ -142,6 +170,27 @@ Gemini AI を使用して PR の自動レビューを行います。
 
 **必要なシークレット:**
 - `GEMINI_API_KEY`
+
+### claude-code-review.yml
+
+Claude Code Action を使用して PR の自動レビューを行います。GitHub Copilot review の premium request quota 超過対策として導入しました。
+
+**入力パラメータ:**
+| パラメータ | 必須 | デフォルト | 説明 |
+|-----------|:----:|-----------|------|
+| `model` | No | `sonnet` | 使用モデル（`sonnet` / `opus` / `haiku`）。卒論・修論など重要リポジトリは `opus` を推奨 |
+| `review_language` | No | `日本語` | レビューコメントの言語 |
+| `timeout_minutes` | No | `15` | ジョブタイムアウト（分） |
+
+**必要なシークレット:**
+- `anthropic_api_key`: Console 発行の `ANTHROPIC_API_KEY`（従量課金）。Claude Max の OAuth トークンは使用不可（他者の PR 横断レビューには規約上 API キーが必要）
+
+**必要な権限:** caller 側のジョブに `id-token: write`（claude-code-action の OIDC 認証で必須）に加え、`contents: read` / `pull-requests: write` / `issues: write`。
+
+**挙動:**
+- draft PR はスキップ（`ready_for_review` で起動）
+- fork PR では secret が渡らないため安全にスキップ
+- ワークフローファイルは default ブランチに存在する必要がある（claude-code-action のセキュリティ検証）
 
 ### create-next-draft.yml
 

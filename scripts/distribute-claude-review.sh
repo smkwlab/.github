@@ -97,7 +97,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review]   # no synchronize: avoid re-reviewing every push
 
 concurrency:
   group: claude-review-\${{ github.event.pull_request.number }}

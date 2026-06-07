@@ -48,6 +48,11 @@ on:
         type: number
         required: false
         default: 15
+      show_full_output:
+        description: "Claude の全出力をログに表示（デバッグ用）。permission_denials の調査時のみ true"
+        type: boolean
+        required: false
+        default: false
     secrets:
       anthropic_api_key:
         description: "Anthropic API key（caller から渡す）"
@@ -94,6 +99,7 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
           claude_args: "--model ${{ inputs.model }}"
+          show_full_output: ${{ inputs.show_full_output }}
           prompt: |
             /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
 

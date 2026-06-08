@@ -8,7 +8,7 @@ name: AI Review (self)
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review]   # no synchronize: avoid re-reviewing on every push (cost). Use @claude for an on-demand re-review.
 
 concurrency:
   group: ai-review-${{ github.event.pull_request.number }}

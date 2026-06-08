@@ -61,6 +61,9 @@ jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
+    # In a workflow_call, github.event is INHERITED from the caller's triggering
+    # event, so for a pull_request caller this draft guard works as expected
+    # (and is null -> skip for non-PR events).
     if: github.event.pull_request.draft == false
     permissions:
       contents: read

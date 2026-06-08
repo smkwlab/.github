@@ -18,7 +18,8 @@ smkwlab organization 運用補助スクリプト。
 
 | caller | 配布先ファイル | 役割 | 必要な前提 |
 |--------|----------------|------|-----------|
-| `claude-code-review` | `.github/workflows/claude-code-review.yml` | PR 自動レビュー | org secret `ANTHROPIC_API_KEY` |
+| `claude-code-review` | `.github/workflows/claude-code-review.yml` | PR 自動レビュー（コード向け: バグ/セキュリティ/ロジック） | org secret `ANTHROPIC_API_KEY` |
+| `claude-paper-review` | `.github/workflows/claude-paper-review.yml` | PR 自動レビュー（論文向け: 論理/構成/新規性/形式） | org secret `ANTHROPIC_API_KEY` |
 | `claude-mention` | `.github/workflows/claude-mention.yml` | `@claude` 対話・修正依頼 | org secret `ANTHROPIC_API_KEY` |
 
 `scripts/distribute-workflow.sh --list-callers` で一覧できます。各 caller の前提は

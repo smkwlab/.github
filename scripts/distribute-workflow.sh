@@ -109,15 +109,40 @@ TEMPLATE="${CALLERS_DIR}/${CALLER}.yml"
 
 WORKFLOW_PATH=".github/workflows/${CALLER}.yml"
 NOTE_FILE="${CALLERS_DIR}/${CALLER}.pr-note.md"
+DEFAULTS_FILE="${CALLERS_DIR}/${CALLER}.defaults"
 [[ -n "$PR_BRANCH" ]] || PR_BRANCH="add-${CALLER}"
 
-# Build sed substitutions: __REF__ plus every KEY=VALUE from VARS as __KEY__.
-# GitHub ${{ ... }} expressions contain no __X__ tokens and are left intact.
-SED_ARGS=(-e "s|__REF__|${REF}|g")
-for kv in "${VARS[@]}"; do
-  SED_ARGS+=(-e "s|__${kv%%=*}__|${kv#*=}|g")
+# Collect token substitutions: CLI --var/--model/--language first (highest
+# precedence), then the caller's optional .defaults, then --ref. sed applies
+# -e in order and the FIRST match for a token wins, so CLI overrides defaults.
+DEFAULTS=()
+if [[ -f "$DEFAULTS_FILE" ]]; then
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
+    DEFAULTS+=("$line")
+  done < "$DEFAULTS_FILE"
+fi
+ORDERED=()
+((${#VARS[@]}))     && ORDERED+=("${VARS[@]}")
+((${#DEFAULTS[@]})) && ORDERED+=("${DEFAULTS[@]}")
+ORDERED+=("REF=${REF}")
+
+# Build sed args. Escape the replacement so a value containing | & \ is treated
+# literally (a generic --var may carry anything). GitHub ${{ ... }} expressions
+# contain no __TOKEN__ and are left intact.
+SED_ARGS=()
+for kv in "${ORDERED[@]}"; do
+  key="${kv%%=*}"; val="${kv#*=}"
+  [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || die "invalid token key: '$key'"
+  esc=$(printf '%s' "$val" | sed -e 's/[\\&|]/\\&/g')
+  SED_ARGS+=(-e "s|__${key}__|${esc}|g")
 done
 render() { sed "${SED_ARGS[@]}" "$1"; }   # render a file with substitutions
+
+# Refuse to distribute a template with any unsubstituted __TOKEN__ (e.g. a
+# forgotten --model). Caught once here, before touching any repository.
+leftover=$(render "$TEMPLATE" | grep -oE '__[A-Za-z0-9_]+__' | sort -u | tr '\n' ' ' || true)
+[[ -z "${leftover// /}" ]] || die "template '${CALLER}' has unsubstituted tokens: ${leftover}(provide them via --var / --model / --language or a ${CALLER}.defaults file)"
 
 PR_TITLE="ci: add ${CALLER} caller"
 pr_body() {
@@ -125,11 +150,12 @@ pr_body() {
   if [[ -f "$NOTE_FILE" ]]; then echo; render "$NOTE_FILE"; fi
 }
 
+vars_disp="${VARS[*]:-}"; [[ -n "$vars_disp" ]] || vars_disp="(none)"
 echo "=== distribute-workflow ==="
 echo "caller:  $CALLER  ->  $WORKFLOW_PATH"
 echo "mode:    $([[ $APPLY == true ]] && echo APPLY || echo DRY-RUN)"
 echo "deliver: $([[ $DIRECT == true ]] && echo 'direct commit to default branch' || echo "pull request ($PR_BRANCH)")"
-echo "ref:     @$REF   vars: ${VARS[*]:-(none)}"
+echo "ref:     @$REF   vars: ${vars_disp}"
 echo "targets: ${REPOS[*]}"
 echo
 
@@ -151,7 +177,7 @@ for raw in "${REPOS[@]}"; do
   content_b64=$(render "$TEMPLATE" | base64 | tr -d '\n')
 
   if [[ $APPLY != true ]]; then
-    info "would add ${WORKFLOW_PATH} (@${REF}${VARS:+, ${VARS[*]}})"
+    info "would add ${WORKFLOW_PATH} (@${REF}; vars: ${vars_disp})"
     info "would deliver via $([[ $DIRECT == true ]] && echo 'direct commit' || echo "PR ${PR_BRANCH} -> ${default_branch}")"
     changed=$((changed+1)); continue
   fi
@@ -167,12 +193,16 @@ for raw in "${REPOS[@]}"; do
     continue
   fi
 
-  head_sha=$(gh api "repos/${repo}/git/refs/heads/${default_branch}" --jq .object.sha)
+  if ! head_sha=$(gh api "repos/${repo}/git/refs/heads/${default_branch}" --jq .object.sha 2>/dev/null); then
+    echo "  ✗ failed to read ${default_branch} head"; failed=$((failed+1)); continue
+  fi
   if gh api "repos/${repo}/git/refs/heads/${PR_BRANCH}" >/dev/null 2>&1; then
     echo "  ✗ branch ${PR_BRANCH} already exists — resolve manually"; failed=$((failed+1)); continue
   fi
-  gh api -X POST "repos/${repo}/git/refs" \
-    -f ref="refs/heads/${PR_BRANCH}" -f sha="${head_sha}" >/dev/null
+  if ! gh api -X POST "repos/${repo}/git/refs" \
+      -f ref="refs/heads/${PR_BRANCH}" -f sha="${head_sha}" >/dev/null 2>&1; then
+    echo "  ✗ failed to create branch ${PR_BRANCH}"; failed=$((failed+1)); continue
+  fi
 
   if ! gh api -X PUT "repos/${repo}/contents/${WORKFLOW_PATH}" \
       -f message="${PR_TITLE}" -f branch="${PR_BRANCH}" \

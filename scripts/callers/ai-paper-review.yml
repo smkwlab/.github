@@ -26,4 +26,4 @@ jobs:
       review_mode: ACADEMIC
       single_comment: true
       language: __LANGUAGE__
-      exclude_paths: "*.bib,*.sty,*.cls"
+      exclude_paths: "__EXCLUDE_PATHS__"

@@ -81,6 +81,27 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # This is a PUBLIC reusable workflow: inputs are caller-controlled. Validate
+      # them before they reach claude_args / the prompt, so a crafted value cannot
+      # inject extra CLI flags or override the prompt. Job fails here on bad input.
+      - name: Validate inputs
+        if: steps.check-key.outputs.skip != 'true'
+        env:
+          MODEL: ${{ inputs.model }}
+          REVIEW_LANGUAGE: ${{ inputs.review_language }}
+        run: |
+          case "$MODEL" in
+            sonnet|opus|haiku) ;;
+            *) echo "::error::invalid model '$MODEL' (allowed: sonnet / opus / haiku)"; exit 1 ;;
+          esac
+          # wc -l catches embedded newlines (grep treats them as line separators
+          # and would miss them); grep catches other control chars within a line.
+          if [ "$(printf '%s' "$REVIEW_LANGUAGE" | wc -l)" -ne 0 ] \
+             || printf '%s' "$REVIEW_LANGUAGE" | grep -q '[[:cntrl:]]' \
+             || [ "${#REVIEW_LANGUAGE}" -gt 20 ]; then
+            echo "::error::review_language must be a short single-line value (no control characters, <= 20 chars)"; exit 1
+          fi
+
       - name: Checkout
         if: steps.check-key.outputs.skip != 'true'
         uses: actions/checkout@v4

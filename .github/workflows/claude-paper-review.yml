@@ -1,0 +1,140 @@
+# Reusable Claude Paper Review Workflow
+#
+# Lightweight single-pass review of an academic manuscript (卒論 / 修論 / レポート)
+# with Claude Code Action. Sibling of claude-code-review.yml: same mechanism, but
+# the prompt is tuned for academic writing (argument, structure, novelty, form)
+# instead of code bugs/security. Use this on LaTeX document repositories where
+# code-review has nothing to flag.
+#
+# Authentication uses a Console-issued ANTHROPIC_API_KEY (metered billing).
+#
+# Required secrets:
+#   - anthropic_api_key: Console-issued Anthropic API key (passed from caller)
+#
+# Usage (caller). Trigger on opened/reopened/ready_for_review (NOT synchronize):
+#   on:
+#     pull_request:
+#       types: [opened, reopened, ready_for_review]
+#   jobs:
+#     review:
+#       uses: smkwlab/.github/.github/workflows/claude-paper-review.yml@v1
+#       permissions:
+#         contents: read
+#         pull-requests: write
+#         issues: write
+#         id-token: write
+#       secrets:
+#         anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+#       with:
+#         model: sonnet          # opus for final drafts / important theses
+
+name: Claude Paper Review (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: "使用モデル（sonnet / opus / haiku）"
+        type: string
+        required: false
+        default: "sonnet"
+      review_language:
+        description: "レビューコメントの言語"
+        type: string
+        required: false
+        default: "日本語"
+      timeout_minutes:
+        description: "ジョブのタイムアウト（分）。長い原稿のハング/課金暴走を防ぐ"
+        type: number
+        required: false
+        default: 20
+      show_full_output:
+        description: "Claude の全出力をログに表示（デバッグ用）"
+        type: boolean
+        required: false
+        default: false
+    secrets:
+      anthropic_api_key:
+        description: "Anthropic API key（caller から渡す）"
+        required: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write  # required by claude-code-action for OIDC
+    steps:
+      - name: Check ANTHROPIC_API_KEY
+        id: check-key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic_api_key }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice::ANTHROPIC_API_KEY is not configured (or unavailable on fork PRs). Skipping Claude paper review."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # This is a PUBLIC reusable workflow: inputs are caller-controlled. Validate
+      # them before they reach claude_args / the prompt, so a crafted value cannot
+      # inject extra CLI flags or override the prompt. Job fails here on bad input.
+      - name: Validate inputs
+        if: steps.check-key.outputs.skip != 'true'
+        env:
+          MODEL: ${{ inputs.model }}
+          REVIEW_LANGUAGE: ${{ inputs.review_language }}
+        run: |
+          case "$MODEL" in
+            sonnet|opus|haiku) ;;
+            *) echo "::error::invalid model '$MODEL' (allowed: sonnet / opus / haiku)"; exit 1 ;;
+          esac
+          # wc -l catches embedded newlines (grep treats them as line separators
+          # and would miss them); grep catches other control chars within a line.
+          if [ "$(printf '%s' "$REVIEW_LANGUAGE" | wc -l)" -ne 0 ] \
+             || printf '%s' "$REVIEW_LANGUAGE" | grep -q '[[:cntrl:]]' \
+             || [ "${#REVIEW_LANGUAGE}" -gt 20 ]; then
+            echo "::error::review_language must be a short single-line value (no control characters, <= 20 chars)"; exit 1
+          fi
+
+      - name: Checkout
+        if: steps.check-key.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Paper Review
+        if: steps.check-key.outputs.skip != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.anthropic_api_key }}
+          show_full_output: ${{ inputs.show_full_output }}
+          claude_args: |
+            --model ${{ inputs.model }}
+            --max-turns 20
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*)"
+          prompt: |
+            このプルリクエスト（${{ github.repository }} #${{ github.event.pull_request.number }}）は学術論文（卒業論文・修士論文・レポート）の原稿です。${{ inputs.review_language }}でレビューしてください。差分（追加・変更された箇所）を中心に、論文として確認してください。
+
+            次の二つの視点で読んでください:
+            - 研究者（査読者）視点: 主張の妥当性・論理・新規性
+            - 指導教員視点: 学生が次に何を直すべきかが伝わる、建設的な助言
+
+            観点:
+            - 学術的正確性・論理: 技術的な誤り、論理の飛躍、根拠の不足、数式・図表・引用の整合
+            - 構成・表現: 章節の構成と流れ、段落のまとまり、明確さ・簡潔さ、用語・記法の一貫性
+            - 新規性・位置づけ: 既存研究との差異、本研究の貢献の明確さ
+            - 形式: 引用・参考文献の形式と完全性、図表の説明・参照、誤字脱字・表記ゆれ
+
+            指摘は該当箇所への inline コメント（mcp__github_inline_comment__create_inline_comment）として投稿し、各指摘の先頭に重大度ラベルを付けてください:
+            - [critical]: 学術的に重大な誤り・論理矛盾
+            - [important]: 直すべき構成・根拠・形式の問題
+            - [suggestion]: 改善するとより良くなる提案
+
+            ささいな好みの指摘は控えめにし、学生の改善につながる指摘を優先してください。
+            重大な問題が無い場合は、良い点と全体評価を1件の要約コメント（gh pr comment）として投稿してください。

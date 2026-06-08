@@ -62,7 +62,7 @@ scripts/distribute-workflow.sh --apply claude-mention \
 |-----------|------|------|
 | `--apply` | （dry-run） | 実際に変更する |
 | `--ref <ref>` | `v1` | 呼び出す reusable の参照（`__REF__` を置換）。タグ/ブランチ/SHA |
-| `--var KEY=VALUE` | — | テンプレ/注記中の `__KEY__` を VALUE に置換（複数指定可）。caller 任意のつまみ |
+| `--var KEY=VALUE` | — | テンプレ/注記中の `__KEY__` を VALUE に置換（複数指定可）。caller 任意のつまみ。`--var` は `--ref`/`--model`/`--language` より優先（例: `--var REF=x` は `--ref` を上書き） |
 | `--model <m>` | — | `--var MODEL=<m>` の別名（Claude caller 用の利便） |
 | `--language <lang>` | — | `--var LANGUAGE=<lang>` の別名 |
 | `--direct` | （PR） | デフォルトブランチへ直接コミット（branch protection の無いリポジトリ向け） |

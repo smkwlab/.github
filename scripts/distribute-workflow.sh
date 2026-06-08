@@ -139,10 +139,14 @@ for kv in "${ORDERED[@]}"; do
 done
 render() { sed "${SED_ARGS[@]}" "$1"; }   # render a file with substitutions
 
-# Refuse to distribute a template with any unsubstituted __TOKEN__ (e.g. a
-# forgotten --model). Caught once here, before touching any repository.
-leftover=$(render "$TEMPLATE" | grep -oE '__[A-Za-z0-9_]+__' | sort -u | tr '\n' ' ' || true)
-[[ -z "${leftover// /}" ]] || die "template '${CALLER}' has unsubstituted tokens: ${leftover}(provide them via --var / --model / --language or a ${CALLER}.defaults file)"
+# Refuse to distribute if any __TOKEN__ is left unsubstituted (e.g. a forgotten
+# --model) in the template OR its PR note. Caught once here, before touching any
+# repository.
+for f in "$TEMPLATE" "$NOTE_FILE"; do
+  [[ -f "$f" ]] || continue
+  leftover=$(render "$f" | grep -oE '__[A-Za-z0-9_]+__' | sort -u | tr '\n' ' ' || true)
+  [[ -z "${leftover// /}" ]] || die "$(basename "$f") has unsubstituted tokens: ${leftover}(provide them via --var / --model / --language or a ${CALLER}.defaults file)"
+done
 
 PR_TITLE="ci: add ${CALLER} caller"
 pr_body() {

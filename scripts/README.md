@@ -18,9 +18,11 @@ smkwlab organization 運用補助スクリプト。
 
 | caller | 配布先ファイル | 役割 | 必要な前提 |
 |--------|----------------|------|-----------|
-| `claude-code-review` | `.github/workflows/claude-code-review.yml` | PR 自動レビュー（コード向け: バグ/セキュリティ/ロジック） | org secret `ANTHROPIC_API_KEY` |
-| `claude-paper-review` | `.github/workflows/claude-paper-review.yml` | PR 自動レビュー（論文向け: 論理/構成/新規性/形式） | org secret `ANTHROPIC_API_KEY` |
+| `ai-code-review` | `.github/workflows/ai-code-review.yml` | PR 自動コードレビュー（ワンショット・inline。Gemini/Claude） | org secret `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` |
+| `ai-paper-review` | `.github/workflows/ai-paper-review.yml` | PR 自動論文レビュー（ワンショット・要約。Gemini/Claude） | org secret `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` |
 | `claude-mention` | `.github/workflows/claude-mention.yml` | `@claude` 対話・修正依頼 | org secret `ANTHROPIC_API_KEY` |
+| `claude-code-review` | `.github/workflows/claude-code-review.yml` | （旧）コードレビュー。claude-code-action 版で低速のため **`ai-code-review` に移行**。退役予定 | org secret `ANTHROPIC_API_KEY` |
+| `claude-paper-review` | `.github/workflows/claude-paper-review.yml` | （旧）論文レビュー。同上、**`ai-paper-review` に移行**。退役予定 | org secret `ANTHROPIC_API_KEY` |
 
 `scripts/distribute-workflow.sh --list-callers` で一覧できます。各 caller の前提は
 `scripts/callers/<caller>.pr-note.md`（PR 本文に付く注記）にも書かれています。

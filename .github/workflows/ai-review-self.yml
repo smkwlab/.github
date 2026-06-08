@@ -1,0 +1,27 @@
+# AI Review — self-caller for this (.github) repository.
+#
+# Exercises the new one-shot ai-review reusable (Claude, CODE mode) on this
+# repo's own PRs. Intended to replace claude-review.yml (claude-code-action)
+# once validated.
+
+name: AI Review (self)
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]   # no synchronize: avoid re-reviewing on every push (cost). Use @claude for an on-demand re-review.
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    uses: ./.github/workflows/ai-review.yml
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets:
+      anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    with:
+      model_code: claude-sonnet-4-6
+      review_mode: CODE

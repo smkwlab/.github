@@ -1,25 +1,108 @@
-# AI Reviewer (Gemini) — caller for this (.github) repository itself.
+# Reusable AI Review Workflow
 #
-# Other repositories call the reusable workflow via
-#   uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@v1
-# but for self-review we reference the reusable by local path so that each PR
-# is reviewed with its own version of the workflow (no need to wait for a tag).
+# One-shot PR review via the smkwlab/ai-academic-paper-reviewer action (a single
+# LLM call, not an agent loop). Provider- and mode-pluggable:
+#   - MODEL_CODE chooses the provider: claude-* -> Anthropic, otherwise Google.
+#   - REVIEW_MODE: CODE (inline, bugs/logic) or ACADEMIC (paper review).
+#   - single_comment: post one summary comment instead of inline (recommended
+#     for ACADEMIC, whose feedback spans the whole document and would otherwise
+#     hit GitHub's diff-line constraint for inline comments).
 #
-# Requires the GEMINI_API_KEY secret. When it is unset (e.g. fork PRs), the
-# reusable workflow skips the review gracefully.
+# This replaces the claude-code-action based claude-code-review / claude-paper-
+# review, which were slow/expensive (agent loop). claude-mention stays on
+# claude-code-action (interactive work genuinely needs the agent).
+#
+# Secrets: pass the key for the chosen provider (the other may be omitted).
+#   - anthropic_api_key: for claude-* models
+#   - gemini_api_key:    for gemini-* models
 
-name: AI Reviewer
+name: AI Review (Reusable)
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_call:
+    inputs:
+      model_code:
+        description: "Model: claude-* (Anthropic) or gemini-* (Google), e.g. claude-sonnet-4-6"
+        type: string
+        required: false
+        default: "claude-sonnet-4-6"
+      review_mode:
+        description: "CODE (inline; bugs/logic) or ACADEMIC (paper review)"
+        type: string
+        required: false
+        default: "CODE"
+      single_comment:
+        description: "Post one summary comment instead of inline (recommended for ACADEMIC)"
+        type: boolean
+        required: false
+        default: false
+      language:
+        description: "Review language (e.g. Japanese)"
+        type: string
+        required: false
+        default: "Japanese"
+      exclude_paths:
+        description: "Comma-separated path globs to exclude (e.g. *.bib,*.sty,*.cls)"
+        type: string
+        required: false
+        default: ""
+      timeout_minutes:
+        description: "Job timeout (minutes)"
+        type: number
+        required: false
+        default: 10
+    secrets:
+      gemini_api_key:
+        required: false
+      anthropic_api_key:
+        required: false
 
 jobs:
-  ai-review:
-    # Skip drafts; review once the PR is ready.
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    # In a workflow_call, github.event is INHERITED from the caller's triggering
+    # event, so for a pull_request caller this draft guard works as expected
+    # (and is null -> skip for non-PR events).
     if: github.event.pull_request.draft == false
-    uses: ./.github/workflows/ai-reviewer.yml
     permissions:
       contents: read
       pull-requests: write
-    secrets: inherit
+    steps:
+      # Validate review_mode and gracefully skip when the provider's key is
+      # absent (e.g. fork PRs receive no secrets).
+      - name: Check inputs and API key
+        id: check
+        env:
+          MODEL_CODE: ${{ inputs.model_code }}
+          REVIEW_MODE: ${{ inputs.review_mode }}
+          GEMINI_API_KEY: ${{ secrets.gemini_api_key }}
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic_api_key }}
+        run: |
+          case "$REVIEW_MODE" in
+            CODE|ACADEMIC) ;;
+            *) echo "::error::invalid review_mode '$REVIEW_MODE' (CODE|ACADEMIC)"; exit 1 ;;
+          esac
+          case "$MODEL_CODE" in
+            *claude*) key="$ANTHROPIC_API_KEY"; name="anthropic_api_key" ;;
+            *)        key="$GEMINI_API_KEY";    name="gemini_api_key" ;;
+          esac
+          if [ -z "$key" ]; then
+            echo "::notice::$name is not configured (or unavailable on fork PRs). Skipping AI review."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: AI Review
+        if: steps.check.outputs.skip != 'true'
+        uses: smkwlab/ai-academic-paper-reviewer@v1.5
+        with:
+          GEMINI_API_KEY: ${{ secrets.gemini_api_key }}
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic_api_key }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODEL_CODE: ${{ inputs.model_code }}
+          REVIEW_MODE: ${{ inputs.review_mode }}
+          LANGUAGE: ${{ inputs.language }}
+          EXCLUDE_PATHS: ${{ inputs.exclude_paths }}
+          USE_SINGLE_COMMENT_REVIEW: ${{ inputs.single_comment }}

@@ -1,8 +1,7 @@
 # AI Review — self-caller for this (.github) repository.
 #
-# Exercises the new one-shot ai-review reusable (Claude, CODE mode) on this
-# repo's own PRs. Intended to replace claude-review.yml (claude-code-action)
-# once validated.
+# Runs the one-shot ai-review reusable (Claude, CODE mode) on this repo's own
+# PRs. Replaces the former claude-review.yml (claude-code-action self-caller).
 
 name: AI Review (self)
 

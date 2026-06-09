@@ -1,11 +1,20 @@
 # Reusable Claude Mention Workflow
 #
 # Interactive @claude handler: a user mentions @claude in an issue comment, PR
-# comment, or new issue to ask a question or request a fix. Claude replies and
-# (for fix requests) can commit changes to the PR branch.
+# comment, or new issue to ask a question or get advice. Claude replies with an
+# answer and concrete suggestions.
+#
+# ADVICE-ONLY (read-only): Claude does NOT edit files or commit. It reads/searches
+# the repo to answer and proposes changes in prose; the author applies them. This
+# is intentional — in the thesis (LaTeX) repos the educational goal is that
+# students write their own work, and across the org we prefer @claude to advise
+# rather than auto-commit. (See issue #49.)
 #
 # This is separate from the review workflow (ai-review.yml): review is automatic
-# on PR open, this is on-demand via the @claude trigger phrase.
+# on PR open, this is on-demand via the @claude trigger phrase. Both are now
+# advice-only; the agent (claude-code-action) is kept here only so @claude can
+# read/search the repo to answer well — replacing it with a one-shot QA path is
+# tracked separately.
 #
 # Authentication uses a Console-issued ANTHROPIC_API_KEY (metered billing).
 #
@@ -26,9 +35,9 @@
 #       if: <@claude present AND author_association in OWNER/MEMBER/COLLABORATOR>
 #       uses: smkwlab/.github/.github/workflows/claude-mention.yml@v1
 #       permissions:
-#         contents: write
-#         pull-requests: write
-#         issues: write
+#         contents: read         # advice-only: no commits, only reads the repo
+#         pull-requests: write   # to post the reply comment
+#         issues: write          # to post the reply comment
 #         id-token: write
 #       secrets:
 #         anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -61,9 +70,9 @@ on:
         required: true
 
 # Serialize @claude sessions per conversation. cancel-in-progress: false (unlike
-# the review workflow) so an in-flight fix is never killed mid-commit and no two
-# sessions push to the same PR branch concurrently; overlapping requests queue.
-# Evaluated against the caller's inherited event, so every caller benefits.
+# the review workflow) so a follow-up mention queues behind an in-flight answer
+# rather than cancelling it (each mention is a distinct question deserving a
+# reply). Evaluated against the caller's inherited event, so every caller benefits.
 concurrency:
   group: claude-mention-${{ github.event.issue.number || github.event.pull_request.number }}
   cancel-in-progress: false
@@ -73,9 +82,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
     permissions:
-      contents: write        # @claude の修正依頼で PR ブランチへコミットするため
-      pull-requests: write
-      issues: write
+      contents: read         # advice-only: @claude は編集・コミットしない（読み取りのみ）
+      pull-requests: write   # 返信コメント投稿のため
+      issues: write          # 返信コメント投稿のため
       id-token: write        # required by claude-code-action for OIDC
     steps:
       - name: Check ANTHROPIC_API_KEY
@@ -103,7 +112,16 @@ jobs:
           anthropic_api_key: ${{ secrets.anthropic_api_key }}
           # Tag mode: no `prompt` — the @claude comment body becomes the instruction.
           trigger_phrase: "@claude"
+          # Advice-only: disallow the edit tools so @claude cannot modify the
+          # checkout (the contents:read token would also block any push, but
+          # disallowing avoids wasted attempts). --disallowedTools takes a
+          # comma- or space-separated list (per `claude --help`), so the single
+          # quoted comma string below is parsed as four tool names. 20 turns is
+          # plenty for read/search + answer (no edit->build->fix loop). Bash stays
+          # allowed for read-only diagnosis (build/grep); it cannot push with a
+          # read token.
           claude_args: |
             --model ${{ inputs.model }}
-            --max-turns 30
-            --append-system-prompt "応答はすべて${{ inputs.language }}で記述してください。コードを修正する場合はリポジトリの CLAUDE.md と既存コードの慣習に従ってください。"
+            --max-turns 20
+            --disallowedTools "Edit,Write,MultiEdit,NotebookEdit"
+            --append-system-prompt "応答はすべて${{ inputs.language }}で記述してください。あなたは助言・指摘のみを行うレビュー補助です。ファイルの編集・コミット・プッシュは行わず、必要な修正は具体的な提案として文章で示してください。コードや文章はリポジトリの CLAUDE.md と既存の慣習に従って助言してください。"

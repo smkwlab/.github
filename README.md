@@ -168,11 +168,16 @@ scripts/distribute-workflow.sh --apply --direct ai-code-review my-repo
 
 ### draft ベースの学生リポジトリ
 
-テンプレートに caller を入れると以降の新規リポジトリへ伝播します。既存の学生リポジトリ（`Nth-draft` ブランチ運用）へ反映するには、配布後に `thesis-student-registry` の `registry-manager propagate-workflow <repo>` で draft ブランチ群へ伝播します。
+テンプレートに caller を入れると以降の新規リポジトリへ伝播します。既存の学生リポジトリ（`Nth-draft` ブランチ運用）へ反映するには、配布後に `thesis-student-registry` の `registry-manager` で draft ブランチ群へ伝播します。
+
+```bash
+# thesis-student-registry のチェックアウト直下で（escript は要ビルド）
+./registry_manager/registry-manager propagate-workflow <repo>
+```
 
 ### 手動で入れる場合
 
-スクリプトを使わず、対象リポジトリに直接 caller ワークフローを置いても構いません（上の「AI レビュー: Claude」の例をコピーし、`ai-code-review.yml` / `ai-paper-review.yml` として `.github/workflows/` に設置）。
+スクリプトを使わず、対象リポジトリに直接 caller ワークフローを置いても構いません（「使い方」セクションの「AI レビュー: Claude（ワンショット）」の例をコピーし、`ai-code-review.yml` / `ai-paper-review.yml` として `.github/workflows/` に設置）。
 
 詳細なオプション（`--ref` / `--var` / `--branch` / caller テンプレートの追加方法）は **[`scripts/README.md`](scripts/README.md)** を参照。
 

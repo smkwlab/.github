@@ -125,7 +125,56 @@ jobs:
       review_mode: CODE
 ```
 
-caller テンプレートは `scripts/distribute-workflow.sh`（`ai-code-review` / `ai-paper-review`）で各リポジトリへ配布できます。
+caller テンプレートは `scripts/distribute-workflow.sh`（`ai-code-review` / `ai-paper-review`）で各リポジトリへ配布できます（次節）。
+
+## 任意のリポジトリへ自動レビューを導入する
+
+`scripts/distribute-workflow.sh` で、共有 caller を任意の smkwlab リポジトリへ配布できます。caller は `smkwlab/.github` の reusable `ai-review.yml@v1` を呼ぶ薄いワークフローです。
+
+### どの caller を使うか
+
+| caller | 用途 | レビュー種別 |
+|--------|------|------------|
+| `ai-code-review` | コード／一般リポジトリ | CODE（inline・バグ/ロジック） |
+| `ai-paper-review` | LaTeX 文書（卒論・修論・ポスター等） | ACADEMIC（要約コメント） |
+
+いずれも既定モデルは `claude-sonnet-4-6`、言語は日本語。プロバイダは `--model gemini-...` で Gemini にも切替可。
+
+### 前提
+
+- 対象リポジトリで org secret `ANTHROPIC_API_KEY` が利用可能であること（未配布なら reusable 側で安全にスキップ）
+- `gh`（GitHub CLI）が対象へ write 権限を持つアカウントで認証済みであること
+
+### 手順（まず1リポジトリで検証 → 横展開）
+
+```bash
+# 1) dry-run（何も変更しない）。コード repo にコードレビューを入れる例
+scripts/distribute-workflow.sh ai-code-review my-repo
+
+# 2) 問題なければ --apply（既定は PR で配布）
+scripts/distribute-workflow.sh --apply ai-code-review my-repo
+
+# 3) 動作確認後に横展開（複数指定可）
+scripts/distribute-workflow.sh --apply ai-code-review repo-a repo-b repo-c
+
+# LaTeX 文書リポジトリには ai-paper-review を使う
+scripts/distribute-workflow.sh --apply ai-paper-review sotsuron-template
+
+# branch protection の無いリポジトリは PR ではなく直接コミットも可
+scripts/distribute-workflow.sh --apply --direct ai-code-review my-repo
+```
+
+既存の別レビュー（旧 `ai-reviewer.yml` 等）がある場合は、配布で追加した後に旧 caller を削除してください（二重レビュー回避）。
+
+### draft ベースの学生リポジトリ
+
+テンプレートに caller を入れると以降の新規リポジトリへ伝播します。既存の学生リポジトリ（`Nth-draft` ブランチ運用）へ反映するには、配布後に `thesis-student-registry` の `registry-manager propagate-workflow <repo>` で draft ブランチ群へ伝播します。
+
+### 手動で入れる場合
+
+スクリプトを使わず、対象リポジトリに直接 caller ワークフローを置いても構いません（上の「AI レビュー: Claude」の例をコピーし、`ai-code-review.yml` / `ai-paper-review.yml` として `.github/workflows/` に設置）。
+
+詳細なオプション（`--ref` / `--var` / `--branch` / caller テンプレートの追加方法）は **[`scripts/README.md`](scripts/README.md)** を参照。
 
 ## ワークフロー詳細
 

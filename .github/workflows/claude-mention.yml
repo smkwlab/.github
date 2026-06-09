@@ -4,8 +4,8 @@
 # comment, or new issue to ask a question or request a fix. Claude replies and
 # (for fix requests) can commit changes to the PR branch.
 #
-# This is separate from the review workflow (claude-code-review.yml): review is
-# automatic on PR open, this is on-demand via the @claude trigger phrase.
+# This is separate from the review workflow (ai-review.yml): review is automatic
+# on PR open, this is on-demand via the @claude trigger phrase.
 #
 # Authentication uses a Console-issued ANTHROPIC_API_KEY (metered billing).
 #

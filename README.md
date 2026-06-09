@@ -25,8 +25,9 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | `create-next-draft.yml` | PR 作成時に次の draft ブランチを自動作成 | 卒論・ISE レポート |
 | `prevent-draft-merge.yml` | draft ブランチの誤マージを防止 | 卒論・ISE レポート |
 | `auto-final-merge.yml` | final-* タグ push 時に承認済み PR を自動マージ | 卒論テンプレート |
-| `ai-reviewer.yml` | Gemini AI による PR 自動レビュー | 全テンプレート |
-| `claude-code-review.yml` | Claude Code Action による PR 自動レビュー | 全テンプレート（重要リポジトリは `opus`） |
+| `ai-review.yml` | ワンショット LLM（Claude/Gemini）による PR 自動レビュー（CODE / ACADEMIC） | 全テンプレート |
+| `claude-mention.yml` | `@claude` メンションによる対話・修正依頼（claude-code-action） | 全テンプレート |
+| `ai-reviewer.yml` | Gemini AI による PR 自動レビュー（旧基盤・`ai-review.yml` に統合予定） | 既存リポジトリ |
 | `notify-ml-on-pr.yml` | PR 作成時にメーリングリストへ通知 | 卒論・ISE レポート |
 
 ### HTML 関連
@@ -99,32 +100,32 @@ jobs:
     secrets: inherit
 ```
 
-#### Claude レビュー（シークレットを明示的に渡す）
+#### AI レビュー: Claude（ワンショット・シークレットを明示的に渡す）
 
 ```yaml
-name: Claude Code Review
+name: AI Code Review
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review]
 
 concurrency:
-  group: claude-review-${{ github.event.pull_request.number }}
+  group: ai-code-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   review:
-    uses: smkwlab/.github/.github/workflows/claude-code-review.yml@v1
+    uses: smkwlab/.github/.github/workflows/ai-review.yml@v1
     permissions:
       contents: read
       pull-requests: write
-      issues: write
-      id-token: write
     secrets:
       anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
     with:
-      model: sonnet
-      review_language: 日本語
+      model_code: claude-sonnet-4-6
+      review_mode: CODE
 ```
+
+caller テンプレートは `scripts/distribute-workflow.sh`（`ai-code-review` / `ai-paper-review`）で各リポジトリへ配布できます。
 
 ## ワークフロー詳細
 
@@ -171,26 +172,38 @@ Gemini AI を使用して PR の自動レビューを行います。
 **必要なシークレット:**
 - `GEMINI_API_KEY`
 
-### claude-code-review.yml
+### ai-review.yml
 
-Claude Code Action を使用して PR の自動レビューを行います。GitHub Copilot review の premium request quota 超過対策として導入しました。
+ワンショット LLM 呼び出し（エージェントループではない）で PR の自動レビューを行います。`smkwlab/ai-academic-paper-reviewer` action を利用し、`model_code` でプロバイダ（`claude-*` → Anthropic / `gemini-*` → Google）を、`review_mode` でレビュー種別（`CODE` インライン / `ACADEMIC` 論文）を切り替えます。低速・高コストだった claude-code-action 版（旧 `claude-code-review.yml` / `claude-paper-review.yml`）を置き換えました。
 
 **入力パラメータ:**
 | パラメータ | 必須 | デフォルト | 説明 |
 |-----------|:----:|-----------|------|
-| `model` | No | `sonnet` | 使用モデル（`sonnet` / `opus` / `haiku`）。卒論・修論など重要リポジトリは `opus` を推奨 |
-| `review_language` | No | `日本語` | レビューコメントの言語 |
-| `timeout_minutes` | No | `15` | ジョブタイムアウト（分） |
+| `model_code` | No | `claude-sonnet-4-6` | モデル。`claude-*`（Anthropic）または `gemini-*`（Google） |
+| `review_mode` | No | `CODE` | `CODE`（インライン・バグ/ロジック）または `ACADEMIC`（論文レビュー） |
+| `single_comment` | No | `false` | インラインではなく要約コメント1件で投稿（`ACADEMIC` 推奨） |
+| `language` | No | `Japanese` | レビュー言語 |
+| `exclude_paths` | No | `""` | 除外パス glob（カンマ区切り、例 `*.bib,*.sty,*.cls`） |
+| `timeout_minutes` | No | `10` | ジョブタイムアウト（分） |
 
-**必要なシークレット:**
-- `anthropic_api_key`: Console 発行の `ANTHROPIC_API_KEY`（従量課金）。Claude Max の OAuth トークンは使用不可（他者の PR 横断レビューには規約上 API キーが必要）
+**必要なシークレット:** 選んだプロバイダのキーのみ渡せば可（他方は省略可）。
+- `anthropic_api_key`: `claude-*` 用。Console 発行の `ANTHROPIC_API_KEY`（従量課金）。Claude Max の OAuth トークンは使用不可
+- `gemini_api_key`: `gemini-*` 用
 
-**必要な権限:** caller 側のジョブに `id-token: write`（claude-code-action の OIDC 認証で必須）に加え、`contents: read` / `pull-requests: write` / `issues: write`。
+**必要な権限:** caller 側のジョブに `contents: read` / `pull-requests: write`。
 
 **挙動:**
-- draft PR は `ready_for_review` になるまでレビューをスキップ（`opened` / `synchronize` 時点では実行しない）
-- fork PR では secret が渡らないため安全にスキップ
-- ワークフローファイルは default ブランチに存在する必要がある（claude-code-action のセキュリティ検証）
+- draft PR はスキップ（`github.event.pull_request.draft == false` ガード。`workflow_call` でも caller の `pull_request` イベントを継承するため機能する）
+- fork PR では secret が渡らないため、キー不在を検出して安全にスキップ
+
+### claude-mention.yml
+
+`@claude` メンションによる対話・コード修正を行います（こちらはエージェントが必要なため claude-code-action のまま維持）。Issue / PR コメントで `@claude` に話しかけると応答・修正します。
+
+**必要なシークレット:**
+- `anthropic_api_key`: Console 発行の `ANTHROPIC_API_KEY`
+
+**必要な権限:** `contents: write` / `pull-requests: write` / `issues: write` / `id-token: write`。
 
 ### create-next-draft.yml
 

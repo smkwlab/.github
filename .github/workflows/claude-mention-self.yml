@@ -20,7 +20,8 @@ jobs:
   claude:
     # Run only when @claude is mentioned AND the author has repository access.
     # The author_association guard prevents random/external users from
-    # triggering a contents:write session. Fork PRs receive no secret anyway.
+    # triggering a session (and spending API budget). Fork PRs receive no
+    # secret anyway. The session itself is advice-only (contents: read).
     if: >
       (github.event_name == 'issue_comment' &&
         contains(github.event.comment.body, '@claude') &&
@@ -33,7 +34,7 @@ jobs:
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
     uses: ./.github/workflows/claude-mention.yml
     permissions:
-      contents: write
+      contents: read         # advice-only: @claude does not commit
       pull-requests: write
       issues: write
       id-token: write

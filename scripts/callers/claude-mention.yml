@@ -1,7 +1,9 @@
-# Caller template: Claude Mention (interactive @claude handler).
+# Caller template: Claude Mention (interactive @claude handler, advice-only).
 # Distributed by scripts/distribute-workflow.sh as
 # .github/workflows/claude-mention.yml in each target repository.
 # The ref / model / language tokens below are substituted at distribution time.
+# @claude answers questions and gives advice; it does not edit or commit
+# (contents: read). See smkwlab/.github#49.
 name: Claude Mention
 
 on:
@@ -15,14 +17,14 @@ on:
 jobs:
   claude:
     # Run only when @claude is mentioned AND the author has repository access
-    # (OWNER/MEMBER/COLLABORATOR), so external users cannot trigger a write run.
+    # (OWNER/MEMBER/COLLABORATOR), so external users cannot trigger a run.
     if: >
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
       (github.event_name == 'issues' && contains(github.event.issue.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
     uses: smkwlab/.github/.github/workflows/claude-mention.yml@__REF__
     permissions:
-      contents: write
+      contents: read         # advice-only: @claude does not commit
       pull-requests: write
       issues: write
       id-token: write

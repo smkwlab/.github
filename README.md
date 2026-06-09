@@ -26,7 +26,7 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | `prevent-draft-merge.yml` | draft ブランチの誤マージを防止 | 卒論・ISE レポート |
 | `auto-final-merge.yml` | final-* タグ push 時に承認済み PR を自動マージ | 卒論テンプレート |
 | `ai-review.yml` | ワンショット LLM（Claude/Gemini）による PR 自動レビュー（CODE / ACADEMIC） | 全テンプレート |
-| `claude-mention.yml` | `@claude` メンションによる対話・修正依頼（claude-code-action） | 全テンプレート |
+| `claude-mention.yml` | `@claude` メンションによる対話（質問・助言、read-only。claude-code-action） | 全テンプレート |
 | `ai-reviewer.yml` | Gemini AI による PR 自動レビュー（旧基盤・`ai-review.yml` に統合予定） | 既存リポジトリ |
 | `notify-ml-on-pr.yml` | PR 作成時にメーリングリストへ通知 | 卒論・ISE レポート |
 
@@ -198,12 +198,14 @@ Gemini AI を使用して PR の自動レビューを行います。
 
 ### claude-mention.yml
 
-`@claude` メンションによる対話・コード修正を行います（こちらはエージェントが必要なため claude-code-action のまま維持）。Issue / PR コメントで `@claude` に話しかけると応答・修正します。
+`@claude` メンションによる対話を行います。Issue / PR コメントで `@claude` に話しかけると、リポジトリを読んで質問に回答し、具体的な修正提案を返します。
+
+**助言のみ（read-only）:** ファイルの編集・コミットは行いません（`contents: read`）。修正は提案を見て本人が適用します。卒論・修論など学習目的のリポジトリで「学生が自分で書く」を尊重するための設計です（#49）。応答に repo の read/search が要るため、レビュー（`ai-review.yml`）と違いエージェント（claude-code-action）を維持しています（ワンショット QA 化は別途検討）。
 
 **必要なシークレット:**
 - `anthropic_api_key`: Console 発行の `ANTHROPIC_API_KEY`
 
-**必要な権限:** `contents: write` / `pull-requests: write` / `issues: write` / `id-token: write`。
+**必要な権限:** `contents: read` / `pull-requests: write` / `issues: write` / `id-token: write`。
 
 ### create-next-draft.yml
 

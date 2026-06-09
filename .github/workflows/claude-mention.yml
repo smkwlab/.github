@@ -114,9 +114,12 @@ jobs:
           trigger_phrase: "@claude"
           # Advice-only: disallow the edit tools so @claude cannot modify the
           # checkout (the contents:read token would also block any push, but
-          # disallowing avoids wasted attempts). 20 turns is plenty for
-          # read/search + answer (no edit->build->fix loop). Bash stays allowed
-          # for read-only diagnosis (build/grep); it cannot push with a read token.
+          # disallowing avoids wasted attempts). --disallowedTools takes a
+          # comma- or space-separated list (per `claude --help`), so the single
+          # quoted comma string below is parsed as four tool names. 20 turns is
+          # plenty for read/search + answer (no edit->build->fix loop). Bash stays
+          # allowed for read-only diagnosis (build/grep); it cannot push with a
+          # read token.
           claude_args: |
             --model ${{ inputs.model }}
             --max-turns 20

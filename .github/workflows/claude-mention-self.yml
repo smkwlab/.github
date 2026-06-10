@@ -54,6 +54,8 @@ jobs:
   # One-shot QA path under evaluation (#50). Same guard as the agent job above;
   # both answer the same mention so they can be compared. No id-token: the
   # one-shot path does not use OIDC.
+  # TODO(#50): remove one of the two jobs when the A/B evaluation concludes —
+  # do not leave both running (double cost per mention).
   claude-qa:
     if: >
       (github.event_name == 'issue_comment' &&

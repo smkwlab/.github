@@ -202,7 +202,7 @@ jobs:
               try {
                 const all = await github.paginate(github.rest.pulls.listReviewComments, { owner, repo, pull_number: issueNumber, per_page: 100 });
                 const rootId = reviewComment.in_reply_to_id || reviewComment.id;
-                const thread = all.filter(c => (c.id === rootId || c.in_reply_to_id === rootId) && c.id !== reviewComment.id);
+                const thread = all.filter(c => (c.id === rootId || c.in_reply_to_id === rootId) && c.id !== reviewComment.id).slice(-20);
                 if (thread.length) {
                   parts.push('## このスレッドのこれまでのコメント\n\n' + thread
                     .map(c => `### ${c.user.login} (${c.created_at})\n${clip(c.body, 3000, 'コメント')}`)
@@ -233,9 +233,12 @@ jobs:
               }
             }
 
-            // Tail-trim drops the lowest-priority sections first (parts are
-            // ordered body -> diff -> review thread -> conversation history);
-            // the question itself lives outside contextText and is never cut.
+            // The trim cuts the END of the joined text. The section order
+            // (body -> diff -> review thread -> conversation history) plus the
+            // per-section caps above guarantee the cut lands in the trailing,
+            // lower-priority sections (thread / history), never inside the
+            // diff (body+diff ≈ 70k < TOTAL_BUDGET); the question itself lives
+            // outside contextText and is never cut.
             const joined = parts.join('\n\n');
             const contextText = clip(joined, TOTAL_BUDGET, '文脈全体');
             if (contextText.length < joined.length) {
@@ -278,7 +281,9 @@ jobs:
               }),
             });
             if (!resp.ok) {
-              core.setFailed(`Anthropic API error ${resp.status}: ${await resp.text()}`);
+              // Truncate: keep logs small and avoid echoing unexpected content.
+              const errText = await resp.text();
+              core.setFailed(`Anthropic API error ${resp.status}: ${errText.slice(0, 500)}`);
               return;
             }
             const data = await resp.json();

@@ -213,11 +213,16 @@ jobs:
               }
             }
 
-            // Conversation history (issue / PR comments before the mention)
-            if (eventName === 'issue_comment') {
+            // Conversation history (issue / PR comments before the mention).
+            // Collected for review-comment mentions too: the question often
+            // refers to the wider PR discussion, not just its own thread.
+            if (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') {
               try {
                 const all = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issueNumber, per_page: 100 });
-                const prior = all.filter(c => c.id !== payload.comment.id).slice(-20);
+                // Drop the triggering comment (already quoted as the question);
+                // review-comment ids live in a different id space, so only
+                // filter on issue_comment events.
+                const prior = all.filter(c => eventName !== 'issue_comment' || c.id !== payload.comment.id).slice(-20);
                 if (prior.length) {
                   parts.push('## これまでの会話（直近のコメント）\n\n' + prior
                     .map(c => `### ${c.user.login} (${c.created_at})\n${clip(c.body, 3000, 'コメント')}`)
@@ -228,7 +233,14 @@ jobs:
               }
             }
 
-            const contextText = clip(parts.join('\n\n'), TOTAL_BUDGET, '文脈全体');
+            // Tail-trim drops the lowest-priority sections first (parts are
+            // ordered body -> diff -> review thread -> conversation history);
+            // the question itself lives outside contextText and is never cut.
+            const joined = parts.join('\n\n');
+            const contextText = clip(joined, TOTAL_BUDGET, '文脈全体');
+            if (contextText.length < joined.length) {
+              core.warning(`文脈全体が ${TOTAL_BUDGET} 文字を超えたため末尾を切り詰めました（元: ${joined.length} 文字）`);
+            }
 
             // --- 4. One Messages API call ---
             const system = [
@@ -249,6 +261,8 @@ jobs:
               contextText,
             ].join('\n');
 
+            // Global fetch is available on github-script@v7's Node 20 runtime
+            // (stable since Node 18); no extra HTTP dependency needed.
             const resp = await fetch('https://api.anthropic.com/v1/messages', {
               method: 'POST',
               headers: {

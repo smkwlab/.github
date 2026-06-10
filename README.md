@@ -106,11 +106,12 @@ jobs:
 name: AI Code Review
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    # synchronize で push のたびに再レビュー。コストが問題なら synchronize を外す。
+    types: [opened, reopened, ready_for_review, synchronize]
 
 concurrency:
   group: ai-code-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: true   # 連続 push 時は古い実行をキャンセル
 
 jobs:
   review:

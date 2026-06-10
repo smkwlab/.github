@@ -1,0 +1,293 @@
+# Reusable Claude QA Workflow (one-shot)
+#
+# One-shot @claude handler: answers a question asked via @claude in an issue
+# comment, PR comment, PR review comment, or new issue with a SINGLE Messages
+# API call (no agent loop). Self-contained plumbing:
+#   - event parsing (issue_comment / pull_request_review_comment / issues)
+#   - context collection (PR -> diff, issue -> body, review comment -> file/
+#     line + thread, conversation history)
+#   - one Anthropic Messages API call
+#   - reply posting (thread reply for review comments, issue comment otherwise)
+#     plus an eyes reaction to acknowledge receipt
+#
+# ADVICE-ONLY by construction: there is no checkout and no agent, so it cannot
+# edit or commit anything. Unlike claude-mention.yml (claude-code-action) it
+# cannot search the repo either — it answers from the context assembled above
+# and is expected to say what is missing when that is not enough.
+#
+# This is the one-shot QA path explored in issue #50 as a replacement for the
+# claude-code-action based claude-mention.yml. No OIDC/id-token, no max-turns,
+# no runaway sessions; same one-shot architecture as ai-review.yml. While under
+# evaluation, claude-mention-self.yml runs both side by side for comparison.
+#
+# Required secrets:
+#   - anthropic_api_key: Console-issued Anthropic API key (passed from caller)
+#
+# Usage (caller in each target repository). Filter the @claude mention AND the
+# author's permission in the CALLER's job `if:` (same guard as claude-mention):
+#   on:
+#     issue_comment:
+#       types: [created]
+#     pull_request_review_comment:
+#       types: [created]
+#     issues:
+#       types: [opened]
+#   jobs:
+#     claude-qa:
+#       if: <@claude present AND author_association in OWNER/MEMBER/COLLABORATOR>
+#       uses: smkwlab/.github/.github/workflows/claude-qa.yml@v1
+#       permissions:
+#         contents: read         # least privilege; no checkout, no commits
+#         pull-requests: write   # to post the reply / reaction on PRs
+#         issues: write          # to post the reply / reaction on issues
+#       secrets:
+#         anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+#       with:
+#         model: claude-sonnet-4-6
+
+name: Claude QA (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: "Anthropic model code for the Messages API (e.g. claude-sonnet-4-6)"
+        type: string
+        required: false
+        default: "claude-sonnet-4-6"
+      language:
+        description: "応答の言語"
+        type: string
+        required: false
+        default: "日本語"
+      timeout_minutes:
+        description: "ジョブのタイムアウト（分）"
+        type: number
+        required: false
+        default: 10
+    secrets:
+      anthropic_api_key:
+        description: "Anthropic API key（caller から渡す）"
+        required: true
+
+# Serialize per conversation, queue follow-ups instead of cancelling (each
+# mention is a distinct question deserving a reply) — same policy as
+# claude-mention.yml but a separate group, so the two can run side by side
+# during the #50 evaluation. Evaluated against the caller's inherited event.
+concurrency:
+  group: claude-qa-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    permissions:
+      contents: read         # least privilege; this job never checks out the repo
+      pull-requests: write   # reply / reaction on PRs
+      issues: write          # reply / reaction on issues
+    steps:
+      # Gracefully skip when the key is absent (e.g. fork PRs receive no secrets).
+      - name: Check ANTHROPIC_API_KEY
+        id: check-key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic_api_key }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice::ANTHROPIC_API_KEY is not configured (or unavailable on fork PRs). Skipping @claude QA."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Answer with one Messages API call
+        if: steps.check-key.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic_api_key }}
+          QA_MODEL: ${{ inputs.model }}
+          QA_LANGUAGE: ${{ inputs.language }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const eventName = context.eventName;
+            const payload = context.payload;
+            const model = process.env.QA_MODEL;
+            const language = process.env.QA_LANGUAGE;
+
+            // Per-section clip keeps one huge section (usually the diff) from
+            // crowding out the question and thread; TOTAL_BUDGET caps the call.
+            const clip = (s, n, label) => {
+              s = s || '';
+              return s.length <= n ? s : s.slice(0, n) + `\n…[${label} が長いため ${n} 文字で切り詰め]`;
+            };
+            const TOTAL_BUDGET = 120000; // chars (~30k tokens), well under the context window
+
+            // --- 1. Parse the event: question, conversation number, reply target ---
+            let question, issueNumber, isPR, reviewComment = null;
+            if (eventName === 'issues') {
+              question = payload.issue.body;
+              issueNumber = payload.issue.number;
+              isPR = !!payload.issue.pull_request;
+            } else if (eventName === 'issue_comment') {
+              question = payload.comment.body;
+              issueNumber = payload.issue.number;
+              isPR = !!payload.issue.pull_request;
+            } else if (eventName === 'pull_request_review_comment') {
+              question = payload.comment.body;
+              issueNumber = payload.pull_request.number;
+              isPR = true;
+              reviewComment = payload.comment;
+            } else {
+              core.setFailed(`Unsupported event: ${eventName} (use issue_comment / pull_request_review_comment / issues)`);
+              return;
+            }
+
+            // --- 2. Eyes reaction to acknowledge receipt (best effort) ---
+            try {
+              if (eventName === 'issues') {
+                await github.rest.reactions.createForIssue({ owner, repo, issue_number: issueNumber, content: 'eyes' });
+              } else if (eventName === 'issue_comment') {
+                await github.rest.reactions.createForIssueComment({ owner, repo, comment_id: payload.comment.id, content: 'eyes' });
+              } else {
+                await github.rest.reactions.createForPullRequestReviewComment({ owner, repo, comment_id: reviewComment.id, content: 'eyes' });
+              }
+            } catch (e) {
+              core.warning(`eyes リアクションの付与に失敗: ${e.message}`);
+            }
+
+            // --- 3. Collect context ---
+            const parts = [];
+
+            // Issue / PR title and body
+            if (eventName === 'pull_request_review_comment') {
+              const pr = payload.pull_request;
+              parts.push(`# Pull Request #${issueNumber}: ${pr.title}\n\n${clip(pr.body, 10000, 'PR 本文')}`);
+            } else {
+              const issue = payload.issue;
+              parts.push(`# ${isPR ? 'Pull Request' : 'Issue'} #${issueNumber}: ${issue.title}\n\n${clip(issue.body, 10000, '本文')}`);
+            }
+
+            // PR diff (fallback: file list when the diff is too large to fetch)
+            if (isPR) {
+              try {
+                const { data: diff } = await github.rest.pulls.get({
+                  owner, repo, pull_number: issueNumber, mediaType: { format: 'diff' },
+                });
+                parts.push(`## PR の diff\n\n\`\`\`diff\n${clip(String(diff), 60000, 'diff')}\n\`\`\``);
+              } catch (e) {
+                core.warning(`diff の取得に失敗（大きすぎる可能性）: ${e.message}`);
+                try {
+                  const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: issueNumber, per_page: 100 });
+                  const list = files.map(f => `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`).join('\n');
+                  parts.push(`## PR の変更ファイル一覧（diff 本体は大きすぎるため取得できず）\n\n${clip(list, 10000, 'ファイル一覧')}`);
+                } catch (e2) {
+                  core.warning(`変更ファイル一覧の取得にも失敗: ${e2.message}`);
+                }
+              }
+            }
+
+            // Review comment: file/line target + its thread
+            if (reviewComment) {
+              parts.push([
+                '## このレビューコメントの対象',
+                `- ファイル: ${reviewComment.path}`,
+                `- 行: ${reviewComment.line ?? reviewComment.original_line ?? '不明'}`,
+                '',
+                '対象の diff hunk:',
+                '```diff',
+                clip(reviewComment.diff_hunk, 5000, 'diff hunk'),
+                '```',
+              ].join('\n'));
+              try {
+                const all = await github.paginate(github.rest.pulls.listReviewComments, { owner, repo, pull_number: issueNumber, per_page: 100 });
+                const rootId = reviewComment.in_reply_to_id || reviewComment.id;
+                const thread = all.filter(c => (c.id === rootId || c.in_reply_to_id === rootId) && c.id !== reviewComment.id);
+                if (thread.length) {
+                  parts.push('## このスレッドのこれまでのコメント\n\n' + thread
+                    .map(c => `### ${c.user.login} (${c.created_at})\n${clip(c.body, 3000, 'コメント')}`)
+                    .join('\n\n'));
+                }
+              } catch (e) {
+                core.warning(`レビュースレッドの取得に失敗: ${e.message}`);
+              }
+            }
+
+            // Conversation history (issue / PR comments before the mention)
+            if (eventName === 'issue_comment') {
+              try {
+                const all = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issueNumber, per_page: 100 });
+                const prior = all.filter(c => c.id !== payload.comment.id).slice(-20);
+                if (prior.length) {
+                  parts.push('## これまでの会話（直近のコメント）\n\n' + prior
+                    .map(c => `### ${c.user.login} (${c.created_at})\n${clip(c.body, 3000, 'コメント')}`)
+                    .join('\n\n'));
+                }
+              } catch (e) {
+                core.warning(`コメント履歴の取得に失敗: ${e.message}`);
+              }
+            }
+
+            const contextText = clip(parts.join('\n\n'), TOTAL_BUDGET, '文脈全体');
+
+            // --- 4. One Messages API call ---
+            const system = [
+              `あなたは GitHub 上の Issue / Pull Request で質問に答えるレビュー補助アシスタントです。応答はすべて${language}で記述してください。`,
+              'あなたは助言・指摘のみを行います。ファイルの編集・コミット・プッシュは行えません。必要な修正は具体的な提案として文章やコード片で示し、適用は質問者に委ねてください。',
+              'リポジトリを検索することはできません。以下に与えられた文脈（Issue/PR 本文・diff・コメント）だけを根拠に回答し、文脈に無い情報が必要な場合は推測で断定せず、何が分かれば答えられるかを明示してください。',
+              '回答はそのまま GitHub のコメントとして投稿されます。GitHub Flavored Markdown で、要点から簡潔に書いてください。',
+            ].join('\n');
+            const userMsg = [
+              `次の ${isPR ? 'Pull Request' : 'Issue'} で @claude にメンションされました。文脈を踏まえて質問・依頼に回答してください。`,
+              '',
+              '## 質問・依頼（メンションされた本文）',
+              '',
+              clip(question, 10000, '質問'),
+              '',
+              '## 文脈',
+              '',
+              contextText,
+            ].join('\n');
+
+            const resp = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'x-api-key': process.env.ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({
+                model,
+                max_tokens: 8192,
+                system,
+                messages: [{ role: 'user', content: userMsg }],
+              }),
+            });
+            if (!resp.ok) {
+              core.setFailed(`Anthropic API error ${resp.status}: ${await resp.text()}`);
+              return;
+            }
+            const data = await resp.json();
+            let answer = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+            if (!answer) {
+              core.setFailed('Anthropic API returned an empty answer.');
+              return;
+            }
+            if (data.stop_reason === 'max_tokens') {
+              answer += '\n\n…（回答が出力上限に達したため途中までです）';
+            }
+            core.info(`usage: ${JSON.stringify(data.usage)}`);
+
+            // --- 5. Post the reply ---
+            const body = `${answer}\n\n---\n*🤖 ワンショット QA（claude-qa.yml / ${model}）による回答*`;
+            if (reviewComment) {
+              // Reply in the review thread. The replies endpoint expects the
+              // TOP-LEVEL comment id, so resolve the thread root.
+              await github.rest.pulls.createReplyForReviewComment({
+                owner, repo, pull_number: issueNumber,
+                comment_id: reviewComment.in_reply_to_id || reviewComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body });
+            }

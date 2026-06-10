@@ -27,6 +27,7 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | `auto-final-merge.yml` | final-* タグ push 時に承認済み PR を自動マージ | 卒論テンプレート |
 | `ai-review.yml` | ワンショット LLM（Claude/Gemini）による PR 自動レビュー（CODE / ACADEMIC） | 全テンプレート |
 | `claude-mention.yml` | `@claude` メンションによる対話（質問・助言、read-only。claude-code-action） | 全テンプレート |
+| `claude-qa.yml` | `@claude` メンションへのワンショット QA 回答（Messages API 1回、エージェントなし）。`claude-mention.yml` の置き換え候補として評価中（#50） | 評価中（この repo のみ） |
 | `ai-reviewer.yml` | Gemini AI による PR 自動レビュー（旧基盤・`ai-review.yml` に統合予定） | 既存リポジトリ |
 | `notify-ml-on-pr.yml` | PR 作成時にメーリングリストへ通知 | 卒論・ISE レポート |
 
@@ -299,12 +300,35 @@ Gemini AI を使用して PR の自動レビューを行います。
 
 `@claude` メンションによる対話を行います。Issue / PR コメントで `@claude` に話しかけると、リポジトリを読んで質問に回答し、具体的な修正提案を返します。
 
-**助言のみ（read-only）:** ファイルの編集・コミットは行いません（`contents: read`）。修正は提案を見て本人が適用します。卒論・修論など学習目的のリポジトリで「学生が自分で書く」を尊重するための設計です（#49）。応答に repo の read/search が要るため、レビュー（`ai-review.yml`）と違いエージェント（claude-code-action）を維持しています（ワンショット QA 化は別途検討）。
+**助言のみ（read-only）:** ファイルの編集・コミットは行いません（`contents: read`）。修正は提案を見て本人が適用します。卒論・修論など学習目的のリポジトリで「学生が自分で書く」を尊重するための設計です（#49）。応答に repo の read/search が要るため、レビュー（`ai-review.yml`）と違いエージェント（claude-code-action）を維持しています（ワンショット QA 化 = `claude-qa.yml` を #50 で評価中）。
 
 **必要なシークレット:**
 - `anthropic_api_key`: Console 発行の `ANTHROPIC_API_KEY`
 
 **必要な権限:** `contents: read` / `pull-requests: write` / `issues: write` / `id-token: write`。
+
+### claude-qa.yml
+
+`@claude` メンションに **ワンショット**（Messages API 1回、エージェントループなし）で回答します。`claude-mention.yml` の置き換え候補として #50 で評価中で、当面はこの repo の `claude-mention-self.yml` でエージェント版と併走させて回答品質・所要時間を比較します。
+
+**仕組み（自己完結）:** イベント解析 → 文脈収集（PR→diff／Issue→本文／レビューコメント→対象 file/line＋スレッド／会話履歴）→ Messages API 1回 → 返信投稿（レビューコメントにはスレッド返信、それ以外は issue コメント）＋👀 リアクション。checkout もエージェントも無いため、構造的に編集・コミット不能です。
+
+**`claude-mention.yml` との違い:**
+- リポジトリの read/search はできず、渡された文脈のみで回答（不足時は何が分かれば答えられるかを明示）
+- OIDC（`id-token: write`）・max-turns・セッション暴走の懸念が無く、高速・低コスト
+- `@claude` 検出と author 権限ガードは caller の `if:` で行う（claude-mention と同一）
+
+**入力パラメータ:**
+| パラメータ | 必須 | デフォルト | 説明 |
+|-----------|:----:|-----------|------|
+| `model` | No | `claude-sonnet-4-6` | Messages API に渡すモデルコード |
+| `language` | No | `日本語` | 応答の言語 |
+| `timeout_minutes` | No | `10` | ジョブタイムアウト（分） |
+
+**必要なシークレット:**
+- `anthropic_api_key`: Console 発行の `ANTHROPIC_API_KEY`
+
+**必要な権限:** `contents: read` / `pull-requests: write` / `issues: write`（`id-token` 不要）。
 
 ### create-next-draft.yml
 

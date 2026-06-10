@@ -3,6 +3,13 @@
 # Interactive @claude handler. References the reusable by local path so this
 # repo's own issues/PRs can use @claude without waiting for a tag.
 #
+# EVALUATION (#50): every @claude mention here triggers BOTH the agent
+# (claude-mention.yml, claude-code-action) and the one-shot QA path
+# (claude-qa.yml), so their answer quality and latency can be compared on the
+# same questions in situ. Once the comparison concludes, the losing job gets
+# removed (and, if one-shot wins, the distributed caller is migrated and
+# claude-code-action dropped).
+#
 # Comment-triggered workflows run from the DEFAULT branch, so this must be on
 # the default branch to take effect.
 
@@ -42,4 +49,29 @@ jobs:
       anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
     with:
       model: sonnet
+      language: 日本語
+
+  # One-shot QA path under evaluation (#50). Same guard as the agent job above;
+  # both answer the same mention so they can be compared. No id-token: the
+  # one-shot path does not use OIDC.
+  claude-qa:
+    if: >
+      (github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'issues' &&
+        contains(github.event.issue.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+    uses: ./.github/workflows/claude-qa.yml
+    permissions:
+      contents: read         # least privilege; the QA path never checks out the repo
+      pull-requests: write
+      issues: write
+    secrets:
+      anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    with:
+      model: claude-sonnet-4-6
       language: 日本語

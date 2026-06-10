@@ -13,8 +13,8 @@
 # This is separate from the review workflow (ai-review.yml): review is automatic
 # on PR open, this is on-demand via the @claude trigger phrase. Both are now
 # advice-only; the agent (claude-code-action) is kept here only so @claude can
-# read/search the repo to answer well — replacing it with a one-shot QA path is
-# tracked separately.
+# read/search the repo to answer well — claude-qa.yml is a one-shot replacement
+# candidate under evaluation (#50, run side by side in claude-mention-self.yml).
 #
 # Authentication uses a Console-issued ANTHROPIC_API_KEY (metered billing).
 #

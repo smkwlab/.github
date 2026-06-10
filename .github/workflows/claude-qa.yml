@@ -74,6 +74,13 @@ on:
 # mention is a distinct question deserving a reply) — same policy as
 # claude-mention.yml but a separate group, so the two can run side by side
 # during the #50 evaluation. Evaluated against the caller's inherited event.
+#
+# The group expression is the standard fallback idiom (same as
+# claude-mention.yml): missing event properties evaluate to empty in Actions
+# expressions, so issue_comment/issues resolve issue.number and
+# pull_request_review_comment falls through to pull_request.number. For PR
+# conversations issue.number IS the PR number, so every event on one PR shares
+# a group. Do NOT add a run_id fallback — it would disable the serialization.
 concurrency:
   group: claude-qa-${{ github.event.issue.number || github.event.pull_request.number }}
   cancel-in-progress: false
@@ -202,6 +209,7 @@ jobs:
               try {
                 const all = await github.paginate(github.rest.pulls.listReviewComments, { owner, repo, pull_number: issueNumber, per_page: 100 });
                 const rootId = reviewComment.in_reply_to_id || reviewComment.id;
+                // Latest 20 only — recent thread context matters most.
                 const thread = all.filter(c => (c.id === rootId || c.in_reply_to_id === rootId) && c.id !== reviewComment.id).slice(-20);
                 if (thread.length) {
                   parts.push('## このスレッドのこれまでのコメント\n\n' + thread
@@ -216,6 +224,7 @@ jobs:
             // Conversation history (issue / PR comments before the mention).
             // Collected for review-comment mentions too: the question often
             // refers to the wider PR discussion, not just its own thread.
+            // issues (opened) is skipped: a just-opened issue has no comments.
             if (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') {
               try {
                 const all = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issueNumber, per_page: 100 });

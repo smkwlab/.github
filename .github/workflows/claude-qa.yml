@@ -136,6 +136,7 @@ jobs:
             // Japanese-heavy text.
             const TOTAL_BUDGET = 200000;  // chars, whole assembled context
             const FULLTEXT_BUDGET = 120000; // chars, shared by the full-text section
+            const MAX_FULLTEXT_FILES = 3; // .tex files included whole, largest change first
 
             // --- 1. Parse the event: question, conversation number, reply target ---
             let question, issueNumber, isPR, reviewComment = null;
@@ -212,6 +213,10 @@ jobs:
             // explicitly (no silent caps).
             if (isPR) {
               try {
+                // reviewComment is truthy only for pull_request_review_comment
+                // events, where payload.pull_request is always present; for
+                // issue_comment on a PR the payload has no pull_request, so
+                // resolve the head sha via the API instead.
                 let headSha = reviewComment ? payload.pull_request.head.sha : null;
                 if (!headSha) {
                   const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issueNumber });
@@ -221,7 +226,6 @@ jobs:
                 const texFiles = files
                   .filter(f => f.filename.endsWith('.tex') && f.status !== 'removed')
                   .sort((a, b) => b.changes - a.changes);
-                const MAX_FULLTEXT_FILES = 3;
                 const picked = texFiles.slice(0, MAX_FULLTEXT_FILES);
                 let remaining = FULLTEXT_BUDGET;
                 for (const f of picked) {
@@ -231,7 +235,9 @@ jobs:
                     if (!data.content) continue; // e.g. >1MB; the diff still covers it
                     const text = Buffer.from(data.content, 'base64').toString('utf8');
                     const clipped = clip(text, remaining, `${f.filename} の全文`);
-                    remaining -= clipped.length;
+                    // clip() may overshoot by its truncation marker; floor at 0
+                    // (the loop guard then stops further files).
+                    remaining = Math.max(0, remaining - clipped.length);
                     parts.push(`## 変更対象ファイルの全文（${f.filename}、PR head 時点）\n\n\`\`\`latex\n${clipped}\n\`\`\``);
                   } catch (eFile) {
                     core.warning(`${f.filename} の全文取得に失敗: ${eFile.message}`);

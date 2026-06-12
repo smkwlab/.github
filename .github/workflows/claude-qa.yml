@@ -214,10 +214,11 @@ jobs:
             if (isPR) {
               try {
                 // reviewComment is truthy only for pull_request_review_comment
-                // events, where payload.pull_request is always present; for
-                // issue_comment on a PR the payload has no pull_request, so
-                // resolve the head sha via the API instead.
-                let headSha = reviewComment ? payload.pull_request.head.sha : null;
+                // events, where payload.pull_request is documented to be
+                // present (optional chaining degrades to the API lookup below
+                // if that ever changes); for issue_comment on a PR the payload
+                // has no pull_request, so resolve the head sha via the API.
+                let headSha = reviewComment ? payload.pull_request?.head?.sha ?? null : null;
                 if (!headSha) {
                   const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issueNumber });
                   headSha = pr.head.sha;
@@ -307,8 +308,10 @@ jobs:
             // history) plus the per-section caps above guarantee the cut lands
             // in the trailing, lower-priority sections (thread / history),
             // never inside the diff or the full text (body 10k + diff 30k +
-            // full text 120k ≈ 160k < TOTAL_BUDGET); the question itself lives
-            // outside contextText and is never cut.
+            // full text 120k ≈ 160k < TOTAL_BUDGET). With a max-size full
+            // text, thread/history may be dropped entirely — accepted: the
+            // document outranks the chatter. The question itself lives outside
+            // contextText and is never cut.
             const joined = parts.join('\n\n');
             const contextText = clip(joined, TOTAL_BUDGET, '文脈全体');
             if (contextText.length < joined.length) {

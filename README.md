@@ -27,7 +27,6 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | `auto-final-merge.yml` | final-* タグ push 時に承認済み PR を自動マージ | 卒論テンプレート |
 | `ai-review.yml` | ワンショット LLM（Claude/Gemini）による PR 自動レビュー（CODE / ACADEMIC） | 全テンプレート |
 | `claude-qa.yml` | `@claude` メンションへのワンショット QA 回答（質問＋diff＋変更 `.tex` 全文＋会話履歴 → Messages API 1回、エージェントなし） | 全テンプレート |
-| `claude-mention.yml` | （**非推奨**）`@claude` 対話の旧エージェント版（claude-code-action）。`claude-qa.yml` へ移行済み（#50） | 未移行 caller のみ |
 | `ai-reviewer.yml` | Gemini AI による PR 自動レビュー（旧基盤・`ai-review.yml` に統合予定） | 既存リポジトリ |
 | `notify-ml-on-pr.yml` | PR 作成時にメーリングリストへ通知 | 卒論・ISE レポート |
 
@@ -297,10 +296,6 @@ Gemini AI を使用して PR の自動レビューを行います。
 - draft PR はスキップ（`github.event.pull_request.draft == false` ガード。`workflow_call` でも caller の `pull_request` イベントを継承するため機能する）
 - fork PR では secret が渡らないため、キー不在を検出して安全にスキップ
 
-### claude-mention.yml（非推奨）
-
-`@claude` 対話の旧エージェント版（claude-code-action）。#50 の実機比較（記録は PR #59）を経て **`claude-qa.yml` へ移行済み**です。原則として新規導入は不可ですが、リポジトリ横断のコード質問が常用される repo に限り例外的に caller を設置できます（[claude-qa.yml の「使い分け」](#claude-qayml)参照）。残置の扱いと削除時期は #62 で管理します。
-
 ### claude-qa.yml
 
 `@claude` メンションに **ワンショット**（Messages API 1回、エージェントループなし）で回答します。旧 `claude-mention.yml`（claude-code-action）の後継で、品質同等（文書質問）・約4倍高速・OIDC 不要です（#50）。
@@ -351,7 +346,8 @@ jobs:
       (github.event_name == 'issues' &&
         contains(github.event.issue.body, '@claude') &&
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
-    uses: smkwlab/.github/.github/workflows/claude-mention.yml@v1
+    # 不変タグを参照する（エージェント版 reusable は main から削除済み・#62）
+    uses: smkwlab/.github/.github/workflows/claude-mention.yml@v1.18.0
     permissions:
       contents: read         # 助言のみ: エージェントだが編集・コミットはしない
       pull-requests: write
@@ -364,8 +360,8 @@ jobs:
       language: 日本語
 ```
 
-> [!WARNING]
-> エージェント版 reusable（`claude-mention.yml`）は #62 で削除予定です。例外設置の需要がある場合は **#62 の実施前に** 申し出てください。削除後にこの最小例の `uses:` 参照は動かなくなり、復活には git 履歴からの reusable 復元（または自前管理）が必要になります。
+> [!NOTE]
+> エージェント版 reusable（`claude-mention.yml`）は #62 で main から削除済みです。上の最小例は reusable が最後に含まれていた**不変タグ `v1.18.0`** を参照しているため、削除後もこのまま動作します（floating `v1` では解決できない点に注意）。
 
 **入力パラメータ:**
 | パラメータ | 必須 | デフォルト | 説明 |

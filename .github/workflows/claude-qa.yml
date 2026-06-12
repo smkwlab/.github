@@ -12,20 +12,20 @@
 #     plus an eyes reaction to acknowledge receipt
 #
 # ADVICE-ONLY by construction: there is no checkout and no agent, so it cannot
-# edit or commit anything. Unlike claude-mention.yml (claude-code-action) it
+# edit or commit anything. Unlike the former agent-based claude-mention.yml it
 # cannot search the repo either — it answers from the context assembled above
 # and is expected to say what is missing when that is not enough.
 #
-# This is the one-shot QA path explored in issue #50 as a replacement for the
-# claude-code-action based claude-mention.yml. No OIDC/id-token, no max-turns,
-# no runaway sessions; same one-shot architecture as ai-review.yml. While under
-# evaluation, claude-mention-self.yml runs both side by side for comparison.
+# This replaced the claude-code-action based claude-mention.yml org-wide after
+# the #50 A/B evaluation (records on PR #59): equal answer quality on the
+# dominant question types, ~4x faster. No OIDC/id-token, no max-turns, no
+# runaway sessions; same one-shot architecture as ai-review.yml.
 #
 # Required secrets:
 #   - anthropic_api_key: Console-issued Anthropic API key (passed from caller)
 #
 # Usage (caller in each target repository). Filter the @claude mention AND the
-# author's permission in the CALLER's job `if:` (same guard as claude-mention):
+# author's permission in the CALLER's job `if:` (see claude-qa-self.yml):
 #   on:
 #     issue_comment:
 #       types: [created]
@@ -72,12 +72,11 @@ on:
         required: true
 
 # Serialize per conversation, queue follow-ups instead of cancelling (each
-# mention is a distinct question deserving a reply) — same policy as
-# claude-mention.yml but a separate group, so the two can run side by side
-# during the #50 evaluation. Evaluated against the caller's inherited event.
+# mention is a distinct question deserving a reply). Evaluated against the
+# caller's inherited event.
 #
-# The group expression is the standard fallback idiom (same as
-# claude-mention.yml): missing event properties evaluate to empty in Actions
+# The group expression is the standard fallback idiom: missing event
+# properties evaluate to empty in Actions
 # expressions, so issue_comment/issues resolve issue.number and
 # pull_request_review_comment falls through to pull_request.number. For PR
 # conversations issue.number IS the PR number, so every event on one PR shares

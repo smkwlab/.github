@@ -9,8 +9,8 @@
 #     hit GitHub's diff-line constraint for inline comments).
 #
 # This replaces the claude-code-action based claude-code-review / claude-paper-
-# review, which were slow/expensive (agent loop). claude-mention stays on
-# claude-code-action (interactive work genuinely needs the agent).
+# review, which were slow/expensive (agent loop). The @claude handler has also
+# migrated to a one-shot (claude-qa.yml, #50) — nothing here runs an agent.
 #
 # Secrets: pass the key for the chosen provider (the other may be omitted).
 #   - anthropic_api_key: for claude-* models

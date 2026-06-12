@@ -1,0 +1,49 @@
+# Claude QA — caller for this (.github) repository itself.
+#
+# One-shot @claude handler. References the reusable by local path so this
+# repo's own issues/PRs can use @claude without waiting for a tag.
+#
+# Replaces claude-mention-self.yml: the A/B evaluation (#50, records on PR #59)
+# concluded with migrating @claude to the one-shot QA path org-wide. Note the
+# trade-off accepted there: cross-file code questions get "I can't see that"
+# instead of an agent's repo search.
+#
+# Comment-triggered workflows run from the DEFAULT branch, so this must be on
+# the default branch to take effect.
+
+name: Claude QA
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened]
+
+jobs:
+  claude-qa:
+    # Run only when @claude is mentioned AND the author has repository access.
+    # The author_association guard prevents random/external users from
+    # triggering a run (and spending API budget). Fork PRs receive no secret
+    # anyway.
+    if: >
+      (github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'issues' &&
+        contains(github.event.issue.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+    uses: ./.github/workflows/claude-qa.yml
+    permissions:
+      contents: read         # advice-only: the QA path never checks out the repo
+      pull-requests: write
+      issues: write
+    secrets:
+      anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    with:
+      model: claude-sonnet-4-6
+      language: 日本語

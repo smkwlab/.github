@@ -299,7 +299,7 @@ Gemini AI を使用して PR の自動レビューを行います。
 
 ### claude-mention.yml（非推奨）
 
-`@claude` 対話の旧エージェント版（claude-code-action）。#50 の実機比較（記録は PR #59）を経て **`claude-qa.yml` へ移行済み**です。未移行の caller が動き続けられるよう残置していますが、新規導入は禁止。全 caller の移行確認後に削除します。
+`@claude` 対話の旧エージェント版（claude-code-action）。#50 の実機比較（記録は PR #59）を経て **`claude-qa.yml` へ移行済み**です。原則として新規導入は不可ですが、リポジトリ横断のコード質問が常用される repo に限り例外的に caller を設置できます（[claude-qa.yml の「使い分け」](#claude-qayml)参照）。残置の扱いと削除時期は #62 で管理します。
 
 ### claude-qa.yml
 
@@ -313,6 +313,59 @@ Gemini AI を使用して PR の自動レビューを行います。
 - リポジトリの read/search はできず、渡された文脈のみで回答（不足時は何が分かれば答えられるかを明示）
 - OIDC（`id-token: write`）・max-turns・セッション暴走の懸念が無く、高速・低コスト
 - `@claude` 検出と author 権限ガードは caller の `if:` で行う（claude-mention と同一）
+
+**使い分け（エージェント版が必要になるケース）:**
+
+#50 の実機 A/B 比較（3ラウンド・6質問、記録は [PR #59](https://github.com/smkwlab/.github/pull/59)）に基づく質問タイプ別の評価:
+
+| 質問タイプ | ワンショット（claude-qa） | エージェント（旧 claude-mention） |
+|-----------|:---------------------:|:----------------------------:|
+| diff 近傍の質問（コード・文書とも） | ◎ 同等 | ◎ |
+| 文書全体の構成・バランス | ◎ 同等（`.tex` 全文同梱で対応） | ◎ |
+| リポジトリ規約・diff 外の文書参照 | △ 「何が分かれば答えられるか」を提示 | ◎ |
+| リポジトリ横断のコード質問 | ✗ 回答不可（誤答はせず、不足情報を明示） | ◎ repo を read/search |
+
+所要時間はワンショット約30秒・エージェント約2〜3分。学生リポジトリ（卒論・修論・レポート）の用途は上2行が中心のため、**原則ワンショットで足ります**。
+
+リポジトリ横断のコード質問が常用される repo（管理ツール等）で支障が出る場合に限り、エージェント版 caller を例外的に設置します。caller テンプレートは削除済みのため、以下の最小例を参考に手動設置してください:
+
+```yaml
+# .github/workflows/claude-mention.yml — エージェント版（例外設置）
+name: Claude Mention
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened]
+jobs:
+  claude:
+    if: >
+      (github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'issues' &&
+        contains(github.event.issue.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+    uses: smkwlab/.github/.github/workflows/claude-mention.yml@v1
+    permissions:
+      contents: read         # 助言のみ: エージェントだが編集・コミットはしない
+      pull-requests: write
+      issues: write
+      id-token: write        # claude-code-action が OIDC で必要とする
+    secrets:
+      anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    with:
+      model: sonnet
+      language: 日本語
+```
+
+> [!WARNING]
+> エージェント版 reusable（`claude-mention.yml`）は #62 で削除予定です。例外設置の需要がある場合は **#62 の実施前に** 申し出てください。削除後にこの最小例の `uses:` 参照は動かなくなり、復活には git 履歴からの reusable 復元（または自前管理）が必要になります。
 
 **入力パラメータ:**
 | パラメータ | 必須 | デフォルト | 説明 |

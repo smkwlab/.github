@@ -4,8 +4,9 @@
 # comment, PR comment, PR review comment, or new issue with a SINGLE Messages
 # API call (no agent loop). Self-contained plumbing:
 #   - event parsing (issue_comment / pull_request_review_comment / issues)
-#   - context collection (PR -> diff, issue -> body, review comment -> file/
-#     line + thread, conversation history)
+#   - context collection (PR -> diff + full text of the changed .tex files,
+#     issue -> body, review comment -> file/line + thread, conversation
+#     history)
 #   - one Anthropic Messages API call
 #   - reply posting (thread reply for review comments, issue comment otherwise)
 #     plus an eyes reaction to acknowledge receipt
@@ -128,7 +129,14 @@ jobs:
               s = s || '';
               return s.length <= n ? s : s.slice(0, n) + `\n…[${label} が長いため ${n} 文字で切り詰め]`;
             };
-            const TOTAL_BUDGET = 120000; // chars (~30k tokens), well under the context window
+            // Sized so a full thesis source fits: the 2025 cohort's largest
+            // final .tex was 180,926 bytes ≈ ~110k chars (Japanese is 3
+            // bytes/char in UTF-8, measured ratio ~0.55-0.61 chars/byte).
+            // 200k chars ≈ well under the model's 200k-token window even for
+            // Japanese-heavy text.
+            const TOTAL_BUDGET = 200000;  // chars, whole assembled context
+            const FULLTEXT_BUDGET = 120000; // chars, shared by the full-text section
+            const MAX_FULLTEXT_FILES = 3; // .tex files included whole, largest change first
 
             // --- 1. Parse the event: question, conversation number, reply target ---
             let question, issueNumber, isPR, reviewComment = null;
@@ -181,7 +189,10 @@ jobs:
                 const { data: diff } = await github.rest.pulls.get({
                   owner, repo, pull_number: issueNumber, mediaType: { format: 'diff' },
                 });
-                parts.push(`## PR の diff\n\n\`\`\`diff\n${clip(String(diff), 60000, 'diff')}\n\`\`\``);
+                // 30k (was 60k): once the full text below is included, the
+                // diff only needs to pinpoint WHAT changed, not carry the
+                // whole document.
+                parts.push(`## PR の diff\n\n\`\`\`diff\n${clip(String(diff), 30000, 'diff')}\n\`\`\``);
               } catch (e) {
                 core.warning(`diff の取得に失敗（大きすぎる可能性）: ${e.message}`);
                 try {
@@ -191,6 +202,56 @@ jobs:
                 } catch (e2) {
                   core.warning(`変更ファイル一覧の取得にも失敗: ${e2.message}`);
                 }
+              }
+            }
+
+            // Full text of the changed .tex files (head version). Paper-wide
+            // questions (structure, balance, chapter flow) need the whole
+            // document, not just the diff — the A/B evaluation showed the
+            // one-shot answer degrading exactly there (#50). Capped by
+            // FULLTEXT_BUDGET, largest-change files first, omissions stated
+            // explicitly (no silent caps).
+            if (isPR) {
+              try {
+                // reviewComment is truthy only for pull_request_review_comment
+                // events, where payload.pull_request is documented to be
+                // present (optional chaining degrades to the API lookup below
+                // if that ever changes); for issue_comment on a PR the payload
+                // has no pull_request, so resolve the head sha via the API.
+                let headSha = reviewComment ? payload.pull_request?.head?.sha ?? null : null;
+                if (!headSha) {
+                  const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issueNumber });
+                  headSha = pr.head.sha;
+                }
+                const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: issueNumber, per_page: 100 });
+                const texFiles = files
+                  .filter(f => f.filename.endsWith('.tex') && f.status !== 'removed')
+                  .sort((a, b) => b.changes - a.changes);
+                const picked = texFiles.slice(0, MAX_FULLTEXT_FILES);
+                let remaining = FULLTEXT_BUDGET;
+                for (const f of picked) {
+                  if (remaining <= 0) break;
+                  try {
+                    const { data } = await github.rest.repos.getContent({ owner, repo, path: f.filename, ref: headSha });
+                    if (!data.content) continue; // e.g. >1MB; the diff still covers it
+                    const text = Buffer.from(data.content, 'base64').toString('utf8');
+                    const clipped = clip(text, remaining, `${f.filename} の全文`);
+                    // clip() may overshoot by its truncation marker; floor at 0
+                    // (the loop guard then stops further files).
+                    remaining = Math.max(0, remaining - clipped.length);
+                    parts.push(`## 変更対象ファイルの全文（${f.filename}、PR head 時点）\n\n\`\`\`latex\n${clipped}\n\`\`\``);
+                  } catch (eFile) {
+                    core.warning(`${f.filename} の全文取得に失敗: ${eFile.message}`);
+                  }
+                }
+                const dropped = texFiles.slice(MAX_FULLTEXT_FILES);
+                if (dropped.length) {
+                  const names = dropped.map(f => f.filename).join(', ');
+                  core.warning(`全文同梱は変更量上位 ${MAX_FULLTEXT_FILES} ファイルまで（省略: ${names}）`);
+                  parts.push(`> 注: 変更された .tex のうち ${dropped.length} 件（${names}）は全文を省略しました（diff には含まれています）。`);
+                }
+              } catch (e) {
+                core.warning(`変更ファイル全文の取得に失敗: ${e.message}`);
               }
             }
 
@@ -243,11 +304,14 @@ jobs:
             }
 
             // The trim cuts the END of the joined text. The section order
-            // (body -> diff -> review thread -> conversation history) plus the
-            // per-section caps above guarantee the cut lands in the trailing,
-            // lower-priority sections (thread / history), never inside the
-            // diff (body+diff ≈ 70k < TOTAL_BUDGET); the question itself lives
-            // outside contextText and is never cut.
+            // (body -> diff -> full text -> review thread -> conversation
+            // history) plus the per-section caps above guarantee the cut lands
+            // in the trailing, lower-priority sections (thread / history),
+            // never inside the diff or the full text (body 10k + diff 30k +
+            // full text 120k ≈ 160k < TOTAL_BUDGET). With a max-size full
+            // text, thread/history may be dropped entirely — accepted: the
+            // document outranks the chatter. The question itself lives outside
+            // contextText and is never cut.
             const joined = parts.join('\n\n');
             const contextText = clip(joined, TOTAL_BUDGET, '文脈全体');
             if (contextText.length < joined.length) {

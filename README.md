@@ -323,11 +323,11 @@ Gemini AI を使用して PR の自動レビューを行います。
 | diff 近傍の質問（コード・文書とも） | ◎ 同等 | ◎ |
 | 文書全体の構成・バランス | ◎ 同等（`.tex` 全文同梱で対応） | ◎ |
 | リポジトリ規約・diff 外の文書参照 | △ 「何が分かれば答えられるか」を提示 | ◎ |
-| リポジトリ横断のコード質問 | ✗ 同上（誤答はしない） | ◎ repo を read/search |
+| リポジトリ横断のコード質問 | ✗ 回答不可（誤答はせず、不足情報を明示） | ◎ repo を read/search |
 
 所要時間はワンショット約30秒・エージェント約2〜3分。学生リポジトリ（卒論・修論・レポート）の用途は上2行が中心のため、**原則ワンショットで足ります**。
 
-リポジトリ横断のコード質問が常用される repo（管理ツール等）で支障が出る場合に限り、エージェント版 caller を例外的に手動設置します（caller テンプレートは削除済み。最小例）:
+リポジトリ横断のコード質問が常用される repo（管理ツール等）で支障が出る場合に限り、エージェント版 caller を例外的に設置します。caller テンプレートは削除済みのため、以下の最小例を参考に手動設置してください:
 
 ```yaml
 # .github/workflows/claude-mention.yml — エージェント版（例外設置）
@@ -342,9 +342,15 @@ on:
 jobs:
   claude:
     if: >
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
-      (github.event_name == 'issues' && contains(github.event.issue.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+      (github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'issues' &&
+        contains(github.event.issue.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
     uses: smkwlab/.github/.github/workflows/claude-mention.yml@v1
     permissions:
       contents: read         # 助言のみ: エージェントだが編集・コミットはしない

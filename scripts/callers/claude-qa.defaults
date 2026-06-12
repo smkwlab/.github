@@ -1,0 +1,4 @@
+# Default token values for the claude-qa caller (overridable via --model /
+# --language / --var at distribution time).
+MODEL=claude-sonnet-4-6
+LANGUAGE=日本語

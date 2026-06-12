@@ -26,8 +26,8 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | `prevent-draft-merge.yml` | draft ブランチの誤マージを防止 | 卒論・ISE レポート |
 | `auto-final-merge.yml` | final-* タグ push 時に承認済み PR を自動マージ | 卒論テンプレート |
 | `ai-review.yml` | ワンショット LLM（Claude/Gemini）による PR 自動レビュー（CODE / ACADEMIC） | 全テンプレート |
-| `claude-mention.yml` | `@claude` メンションによる対話（質問・助言、read-only。claude-code-action） | 全テンプレート |
-| `claude-qa.yml` | `@claude` メンションへのワンショット QA 回答（Messages API 1回、エージェントなし）。`claude-mention.yml` の置き換え候補として評価中（#50） | 評価中（この repo のみ） |
+| `claude-qa.yml` | `@claude` メンションへのワンショット QA 回答（質問＋diff＋変更 `.tex` 全文＋会話履歴 → Messages API 1回、エージェントなし） | 全テンプレート |
+| `claude-mention.yml` | （**非推奨**）`@claude` 対話の旧エージェント版（claude-code-action）。`claude-qa.yml` へ移行済み（#50） | 未移行 caller のみ |
 | `ai-reviewer.yml` | Gemini AI による PR 自動レビュー（旧基盤・`ai-review.yml` に統合予定） | 既存リポジトリ |
 | `notify-ml-on-pr.yml` | PR 作成時にメーリングリストへ通知 | 卒論・ISE レポート |
 
@@ -135,10 +135,11 @@ caller テンプレートは `scripts/distribute-workflow.sh`（`ai-code-review`
 
 ### どの caller を使うか
 
-| caller | 用途 | レビュー種別 |
+| caller | 用途 | 種別 |
 |--------|------|------------|
 | `ai-code-review` | コード／一般リポジトリ | CODE（inline・バグ/ロジック） |
 | `ai-paper-review` | LaTeX 文書（卒論・修論・ポスター等） | ACADEMIC（要約コメント） |
+| `claude-qa` | `@claude` メンションでの質問・助言（全リポジトリ種別） | ワンショット QA |
 
 いずれも既定モデルは `claude-sonnet-4-6`、言語は日本語。プロバイダは `--model gemini-...` で Gemini にも切替可。
 
@@ -296,26 +297,19 @@ Gemini AI を使用して PR の自動レビューを行います。
 - draft PR はスキップ（`github.event.pull_request.draft == false` ガード。`workflow_call` でも caller の `pull_request` イベントを継承するため機能する）
 - fork PR では secret が渡らないため、キー不在を検出して安全にスキップ
 
-### claude-mention.yml
+### claude-mention.yml（非推奨）
 
-`@claude` メンションによる対話を行います。Issue / PR コメントで `@claude` に話しかけると、リポジトリを読んで質問に回答し、具体的な修正提案を返します。
-
-**助言のみ（read-only）:** ファイルの編集・コミットは行いません（`contents: read`）。修正は提案を見て本人が適用します。卒論・修論など学習目的のリポジトリで「学生が自分で書く」を尊重するための設計です（#49）。応答に repo の read/search が要るため、レビュー（`ai-review.yml`）と違いエージェント（claude-code-action）を維持しています（ワンショット QA 化 = `claude-qa.yml` を #50 で評価中）。
-
-**必要なシークレット:**
-- `anthropic_api_key`: Console 発行の `ANTHROPIC_API_KEY`
-
-**必要な権限:** `contents: read` / `pull-requests: write` / `issues: write` / `id-token: write`。
+`@claude` 対話の旧エージェント版（claude-code-action）。#50 の実機比較（記録は PR #59）を経て **`claude-qa.yml` へ移行済み**です。未移行の caller が動き続けられるよう残置していますが、新規導入は禁止。全 caller の移行確認後に削除します。
 
 ### claude-qa.yml
 
-`@claude` メンションに **ワンショット**（Messages API 1回、エージェントループなし）で回答します。`claude-mention.yml` の置き換え候補として #50 で評価中で、当面はこの repo の `claude-mention-self.yml` でエージェント版と併走させて回答品質・所要時間を比較します。
+`@claude` メンションに **ワンショット**（Messages API 1回、エージェントループなし）で回答します。旧 `claude-mention.yml`（claude-code-action）の後継で、品質同等（文書質問）・約4倍高速・OIDC 不要です（#50）。
 
 **仕組み（自己完結）:** イベント解析 → 文脈収集（PR→diff＋**変更された `.tex` の全文**（head 時点・変更量上位3ファイル・全文予算 120k 文字）／Issue→本文／レビューコメント→対象 file/line＋スレッド／会話履歴）→ Messages API 1回 → 返信投稿（レビューコメントにはスレッド返信、それ以外は issue コメント）＋👀 リアクション。checkout もエージェントも無いため、構造的に編集・コミット不能です。
 
 全文同梱により、論文全体の構成・バランスに関する質問にも diff の断片からの推測でなく実際の文書全体を根拠に回答できます。サイズは 2025 年度実績（最終 `.tex` 最大 180,926 バイト ≈ 約11万文字）が全文予算に収まるよう設計しています。
 
-**`claude-mention.yml` との違い:**
+**旧 `claude-mention.yml`（エージェント版）との違い:**
 - リポジトリの read/search はできず、渡された文脈のみで回答（不足時は何が分かれば答えられるかを明示）
 - OIDC（`id-token: write`）・max-turns・セッション暴走の懸念が無く、高速・低コスト
 - `@claude` 検出と author 権限ガードは caller の `if:` で行う（claude-mention と同一）

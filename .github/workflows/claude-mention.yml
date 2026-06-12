@@ -1,5 +1,12 @@
 # Reusable Claude Mention Workflow
 #
+# ⚠️ DEPRECATED (#50): @claude has migrated to the one-shot claude-qa.yml —
+# same trigger and guard, a single Messages API call instead of a
+# claude-code-action agent session (no OIDC, ~4x faster, equal quality on
+# document questions per the A/B records on PR #59). This file remains only so
+# not-yet-migrated callers keep working; do not install new callers of it.
+# It will be removed once no caller references it.
+#
 # Interactive @claude handler: a user mentions @claude in an issue comment, PR
 # comment, or new issue to ask a question or get advice. Claude replies with an
 # answer and concrete suggestions.

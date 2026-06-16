@@ -57,14 +57,15 @@ graph LR
 
 ## ⚙️ 開発・教育基盤
 
-複数リポジトリ・多数の学生リポジトリに共通機能を配布・運用するための仕組みです。
+複数リポジトリ・多数の学生リポジトリに共通機能を配布・運用するための仕組みと、演習用の開発環境です。
 
 | プロジェクト | 役割 |
 |---|---|
 | [.github](https://github.com/smkwlab/.github) | org 共通の Reusable Workflows（CI・LaTeX ビルド・AI レビュー・ML 通知 等）と community health files |
 | [thesis-management-tools](https://github.com/smkwlab/thesis-management-tools) | 論文・レポート管理を支援する教員・管理者向けツール群 |
 | [ise-report](https://github.com/smkwlab/ise-report) | 情報科学演習レポートの進捗ダッシュボード |
-| [atcoder-env](https://github.com/smkwlab/atcoder-env) / [atcoder-container](https://github.com/smkwlab/atcoder-container) | 競技プログラミング（AtCoder）演習用の開発環境・コンテナ |
+| [atcoder-env](https://github.com/smkwlab/atcoder-env) | AtCoder 参加用の Dev Container 環境。VS Code で開くと acc / oj や独自タスク込みの環境が構築され、新規コンテスト作成・テスト・提出まで完結（学生の競プロ演習向け） |
+| [atcoder-container](https://github.com/smkwlab/atcoder-container) | atcoder-env が利用する AtCoder 用コンテナイメージ。9 言語（Java/Python/C++/Rust/Ruby/Elixir/Erlang/JS）＋AC Library 等の競技用ライブラリ込み、lite / full の 2 版を提供 |
 
 ---
 
@@ -74,6 +75,7 @@ graph LR
 
 - DNS ライブラリ／ツール: [tenbin_dns](https://github.com/smkwlab/tenbin_dns) / [tdig](https://github.com/smkwlab/tdig) / [elixir_dnstap](https://github.com/smkwlab/elixir_dnstap)
 - LaTeX 執筆環境: [latex-environment](https://github.com/smkwlab/latex-environment) → 各テンプレート
+- 競技プログラミング: [atcoder-env](https://github.com/smkwlab/atcoder-env) を VS Code で開く
 
 ## 🛠 共通開発規約
 

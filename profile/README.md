@@ -1,7 +1,11 @@
 # 下川研究室 (smkwlab)
 
-**九州産業大学 理工学部 情報科学科 下川研究室**のソフトウェア開発・教育基盤の組織アカウントです。
-研究で開発している DNS/Elixir ソフトウェア群、卒業論文・レポート作成を支える LaTeX 文書基盤、競技プログラミング（AtCoder）演習用の開発環境、そしてそれらを横断する CI / AI レビュー基盤を公開しています。
+**九州産業大学 理工学部 情報科学科 下川研究室**のソフトウェア開発・教育基盤の組織アカウントです。以下を公開しています。
+
+- **DNS/Elixir ソフトウェア群** — 研究で開発している DNS スタック
+- **LaTeX 文書基盤** — 卒業論文・レポート作成を支えるテンプレートとツール
+- **競技プログラミング演習環境** — AtCoder 参加用の開発環境
+- **CI / AI レビュー基盤** — 上記を横断する共通ワークフロー
 
 ---
 
@@ -19,9 +23,6 @@ graph LR
 
   tenbin_dns["tenbin_dns (packet library)"]
   elixir_dnstap["elixir_dnstap (DNSTap logging)"]
-
-  classDef private stroke-dasharray: 5 5;
-  class tenbin_ex,tenbin_cache private;
 ```
 
 > 🔒 付きのノード（`tenbin_ex` / `tenbin_cache`）は研究用途で開発中のサーバーコンポーネントで、現在は非公開です。
@@ -38,9 +39,9 @@ graph LR
 
 ---
 
-## 📄 LaTeX 文書エコシステム
+## 📄 文書作成エコシステム（LaTeX / HTML）
 
-卒業論文・修士論文・演習レポート・ポスターを、再現性のある環境で作成し、PR ベースのレビューと自動 PDF ビルドに載せるための基盤です。
+卒業論文・修士論文・ポスターを LaTeX で、情報科学演習レポートを HTML で——再現性のある環境で作成し、PR ベースのレビューと自動ビルドに載せるための基盤です。
 
 | プロジェクト | 役割 |
 |---|---|
@@ -84,6 +85,8 @@ AtCoder への参加を VS Code 上で完結させる、学生の競技プログ
 - LaTeX 執筆環境: [latex-environment](https://github.com/smkwlab/latex-environment) → 各テンプレート
 - 競技プログラミング: [atcoder-env](https://github.com/smkwlab/atcoder-env) を VS Code で開く
 
+---
+
 ## 🛠 共通開発規約
 
 - **ブランチ**: 機能ごとに feature ブランチを作成（英語・説明的な名前）
@@ -92,6 +95,8 @@ AtCoder への参加を VS Code 上で完結させる、学生の競技プログ
 - **Elixir プロジェクトの品質ゲート**: `mix format` / `mix test` / `mix credo --strict`（Lefthook でコミット時に自動実行）
 
 ワークフローの利用方法・バージョニング規約は [.github リポジトリの README](https://github.com/smkwlab/.github) を参照してください。
+
+---
 
 ## 📜 ライセンス
 

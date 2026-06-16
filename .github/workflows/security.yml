@@ -13,12 +13,12 @@ on:
     inputs:
       otp-version:
         description: 'OTP version'
-        default: '28.5'
+        default: '29.0.2'
         required: false
         type: string
       elixir-version:
         description: 'Elixir version'
-        default: '1.19.5'
+        default: '1.20.1'
         required: false
         type: string
       dependency-audit-timeout:

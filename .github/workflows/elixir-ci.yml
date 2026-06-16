@@ -24,12 +24,12 @@ on:
         type: string
       otp-version-latest:
         description: 'Latest OTP version'
-        default: '28.5'
+        default: '29.0.2'
         required: false
         type: string
       elixir-version-latest:
         description: 'Latest Elixir version'
-        default: '1.19.5'
+        default: '1.20.1'
         required: false
         type: string
       dialyzer-enabled:

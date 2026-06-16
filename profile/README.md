@@ -12,9 +12,9 @@ Elixir/OTP で実装した DNS ソフトウェア群です。低レベルのパ�
 ```mermaid
 graph LR
   tdig["tdig (CLI)"] --> tenbin_dns
-  tenbin_ex["tenbin_ex (server)"] --> tenbin_dns
+  tenbin_ex["🔒 tenbin_ex (server)"] --> tenbin_dns
   tenbin_ex --> elixir_dnstap
-  tenbin_cache["tenbin_cache (cache proxy)"] --> tenbin_dns
+  tenbin_cache["🔒 tenbin_cache (cache proxy)"] --> tenbin_dns
   tenbin_cache --> elixir_dnstap
 
   tenbin_dns["tenbin_dns (packet library)"]
@@ -24,7 +24,7 @@ graph LR
   class tenbin_ex,tenbin_cache private;
 ```
 
-> 破線のノード（`tenbin_ex` / `tenbin_cache`）は研究用途で開発中のサーバーコンポーネントで、現在は非公開です。
+> 🔒 付きのノード（`tenbin_ex` / `tenbin_cache`）は研究用途で開発中のサーバーコンポーネントで、現在は非公開です。
 
 ### ユースケース別の選び方
 
@@ -62,7 +62,7 @@ AtCoder への参加を VS Code 上で完結させる、学生の競技プログ
 | プロジェクト | 役割 |
 |---|---|
 | [atcoder-env](https://github.com/smkwlab/atcoder-env) | AtCoder 参加用の Dev Container 環境。VS Code で開くと acc / oj や独自タスク込みの環境が構築され、新規コンテスト作成・テスト・提出まで完結 |
-| [atcoder-container](https://github.com/smkwlab/atcoder-container) | atcoder-env が利用する AtCoder 用コンテナイメージ。9 言語（Java/Python/C++/Rust/Ruby/Elixir/Erlang/JS）＋AC Library 等の競技用ライブラリ込み、lite / full の 2 版を提供 |
+| [atcoder-container](https://github.com/smkwlab/atcoder-container) | atcoder-env が利用する AtCoder 用コンテナイメージ。8 言語（Java/Python/C++/Rust/Ruby/Elixir/Erlang/JS）＋AC Library 等の競技用ライブラリ込み、lite / full の 2 版を提供 |
 
 ---
 
@@ -72,15 +72,15 @@ AtCoder への参加を VS Code 上で完結させる、学生の競技プログ
 
 | プロジェクト | 役割 |
 |---|---|
-| [.github](https://github.com/smkwlab/.github) | org 共通の Reusable Workflows（CI・LaTeX ビルド・AI レビュー・ML 通知 等）と community health files |
+| [.github](https://github.com/smkwlab/.github) | org 共通の Reusable Workflows（CI・LaTeX ビルド・AI レビュー・メーリングリスト通知 等）と community health files |
 
 ---
 
 ## 🚀 各プロジェクトの始め方
 
-公開プロジェクトの README には、3 ステップで動作確認できる **Quick Start** を用意しています。各リポジトリの README 冒頭を参照してください。
+各プロジェクトの README 冒頭にセットアップ・動作確認の手順を用意しています。とくに DNS/Elixir 群の README には、3 ステップで動作確認できる **Quick Start** があります。
 
-- DNS ライブラリ／ツール: [tenbin_dns](https://github.com/smkwlab/tenbin_dns) / [tdig](https://github.com/smkwlab/tdig) / [elixir_dnstap](https://github.com/smkwlab/elixir_dnstap)
+- DNS ライブラリ／ツール: [tenbin_dns](https://github.com/smkwlab/tenbin_dns) / [tdig](https://github.com/smkwlab/tdig) / [elixir_dnstap](https://github.com/smkwlab/elixir_dnstap)（各 README の Quick Start を参照）
 - LaTeX 執筆環境: [latex-environment](https://github.com/smkwlab/latex-environment) → 各テンプレート
 - 競技プログラミング: [atcoder-env](https://github.com/smkwlab/atcoder-env) を VS Code で開く
 

@@ -57,14 +57,23 @@ graph LR
 
 ## ⚙️ 開発・教育基盤
 
-複数リポジトリ・多数の学生リポジトリに共通機能を配布・運用するための仕組みと、演習用の開発環境です。
+複数リポジトリ・多数の学生リポジトリに共通機能を配布・運用するための仕組みです。
 
 | プロジェクト | 役割 |
 |---|---|
 | [.github](https://github.com/smkwlab/.github) | org 共通の Reusable Workflows（CI・LaTeX ビルド・AI レビュー・ML 通知 等）と community health files |
 | [thesis-management-tools](https://github.com/smkwlab/thesis-management-tools) | 論文・レポート管理を支援する教員・管理者向けツール群 |
 | [ise-report](https://github.com/smkwlab/ise-report) | 情報科学演習レポートの進捗ダッシュボード |
-| [atcoder-env](https://github.com/smkwlab/atcoder-env) | AtCoder 参加用の Dev Container 環境。VS Code で開くと acc / oj や独自タスク込みの環境が構築され、新規コンテスト作成・テスト・提出まで完結（学生の競プロ演習向け） |
+
+---
+
+## 🏆 競技プログラミング演習環境
+
+AtCoder への参加を VS Code 上で完結させる、学生の競技プログラミング演習向け環境です。Dev Container を開くだけで、新規コンテスト作成・テスト・提出までをタスクで実行できます。
+
+| プロジェクト | 役割 |
+|---|---|
+| [atcoder-env](https://github.com/smkwlab/atcoder-env) | AtCoder 参加用の Dev Container 環境。VS Code で開くと acc / oj や独自タスク込みの環境が構築され、新規コンテスト作成・テスト・提出まで完結 |
 | [atcoder-container](https://github.com/smkwlab/atcoder-container) | atcoder-env が利用する AtCoder 用コンテナイメージ。9 言語（Java/Python/C++/Rust/Ruby/Elixir/Erlang/JS）＋AC Library 等の競技用ライブラリ込み、lite / full の 2 版を提供 |
 
 ---

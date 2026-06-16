@@ -64,7 +64,7 @@ graph LR
 | [.github](https://github.com/smkwlab/.github) | org 共通の Reusable Workflows（CI・LaTeX ビルド・AI レビュー・ML 通知 等）と community health files |
 | [thesis-management-tools](https://github.com/smkwlab/thesis-management-tools) | 論文・レポート管理を支援する教員・管理者向けツール群 |
 | [ise-report](https://github.com/smkwlab/ise-report) | 情報科学演習レポートの進捗ダッシュボード |
-| [atcoder-env](https://github.com/smkwlab/atcoder-env) / [atcoder-container](https://github.com/smkwlab/atcoder-container) | 競technあ... |
+| [atcoder-env](https://github.com/smkwlab/atcoder-env) / [atcoder-container](https://github.com/smkwlab/atcoder-container) | 競技プログラミング（AtCoder）演習用の開発環境・コンテナ |
 
 ---
 

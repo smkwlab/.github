@@ -45,14 +45,16 @@ graph LR
 
 | プロジェクト | 役割 |
 |---|---|
-| [latex-ecosystem](https://github.com/smkwlab/latex-ecosystem) | LaTeX テンプレート群とツールの全体管理 |
-| [latex-environment](https://github.com/smkwlab/latex-environment) | Dev Container ベースの再現可能な TeX 執筆環境 |
 | [latex-template](https://github.com/smkwlab/latex-template) | 汎用 LaTeX ドキュメントテンプレート |
+| [ise-report-template](https://github.com/smkwlab/ise-report-template) | 情報科学演習レポート用テンプレート（HTML5） |
 | [sotsuron-template](https://github.com/smkwlab/sotsuron-template) | 卒業論文テンプレート（draft ブランチ運用） |
 | [poster-template](https://github.com/smkwlab/poster-template) | 学会発表用 A0 ポスターテンプレート（tikzposter・日本語対応） |
-| [ise-report-template](https://github.com/smkwlab/ise-report-template) | 情報科学演習レポート用テンプレート（HTML5） |
-| [latex-release-action](https://github.com/smkwlab/latex-release-action) | LaTeX ビルド & PDF リリースを自動化する GitHub Action |
 | [split-sentences](https://github.com/smkwlab/split-sentences) | LaTeX 文書を 1 文 1 行に整形し diff を見やすくするツール |
+| [texlive-ja-textlint](https://github.com/smkwlab/texlive-ja-textlint) | 日本語 LaTeX コンパイル用の Docker イメージ（TeX Live + textlint）。下記環境の土台 |
+| [latex-environment](https://github.com/smkwlab/latex-environment) | Dev Container ベースの再現可能な TeX 執筆環境（各テンプレートに組み込まれ自動的に使われる） |
+| [aldc](https://github.com/smkwlab/aldc) | 既存テンプレートに LaTeX 用 Dev Container を追加する CLI ツール |
+| [latex-release-action](https://github.com/smkwlab/latex-release-action) | LaTeX ビルド & PDF リリースを自動化する GitHub Action |
+| [latex-ecosystem](https://github.com/smkwlab/latex-ecosystem) | LaTeX テンプレート群とツールの全体管理 |
 
 ---
 

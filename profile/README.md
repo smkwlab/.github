@@ -2,40 +2,10 @@
 
 **九州産業大学 理工学部 情報科学科 下川研究室**のソフトウェア開発・教育基盤の組織アカウントです。以下を公開しています。
 
-- **DNS/Elixir ソフトウェア群** — 研究で開発している DNS スタック
 - **LaTeX 文書基盤** — 卒業論文・レポート作成を支えるテンプレートとツール
 - **競技プログラミング演習環境** — AtCoder 参加用の開発環境
+- **DNS/Elixir ソフトウェア群** — 研究で開発している DNS スタック
 - **CI / AI レビュー基盤** — 上記を横断する共通ワークフロー
-
----
-
-## 🌐 DNS / Elixir エコシステム
-
-Elixir/OTP で実装した DNS ソフトウェア群です。低レベルのパケット処理ライブラリを土台に、CLI ツール・サーバー・ロギング基盤を組み合わせられる構成になっています。
-
-```mermaid
-graph LR
-  tdig["tdig (CLI)"] --> tenbin_dns
-  tenbin_ex["🔒 tenbin_ex (server)"] --> tenbin_dns
-  tenbin_ex --> elixir_dnstap
-  tenbin_cache["🔒 tenbin_cache (cache proxy)"] --> tenbin_dns
-  tenbin_cache --> elixir_dnstap
-
-  tenbin_dns["tenbin_dns (packet library)"]
-  elixir_dnstap["elixir_dnstap (DNSTap logging)"]
-```
-
-> 🔒 付きのノード（`tenbin_ex` / `tenbin_cache`）は研究用途で開発中のサーバーコンポーネントで、現在は非公開です。
-
-### ユースケース別の選び方
-
-| やりたいこと | プロジェクト | 公開状況 |
-|---|---|---|
-| DNS パケットを Elixir で解析・生成したい | [**tenbin_dns**](https://github.com/smkwlab/tenbin_dns) — 19+ レコードタイプ・DNSSEC・EDNS0 対応のパース/生成ライブラリ | ✅ 公開 |
-| コマンドラインで DNS を引きたい（`dig` 互換） | [**tdig**](https://github.com/smkwlab/tdig) — dig 互換出力の CLI。ビルド済みバイナリ配布あり | ✅ 公開 |
-| DNSTap ロギングを組み込みたい | [**elixir_dnstap**](https://github.com/smkwlab/elixir_dnstap) — Frame Streams 対応の DNSTap ロギングライブラリ（Hex 公開） | ✅ 公開 |
-| ポリシーベースの DNS サーバーを動かしたい | **tenbin_ex** — 動的応答ポリシーを差し込める権威サーバー | 🔒 研究用（非公開） |
-| 透過型 DNS キャッシュプロキシが欲しい | **tenbin_cache** — 無加工転送に特化した薄いキャッシュプロキシ | 🔒 研究用（非公開） |
 
 ---
 
@@ -69,6 +39,36 @@ AtCoder への参加を VS Code 上で完結させる、学生の競技プログ
 
 ---
 
+## 🌐 DNS / Elixir エコシステム
+
+Elixir/OTP で実装した DNS ソフトウェア群です。低レベルのパケット処理ライブラリを土台に、CLI ツール・サーバー・ロギング基盤を組み合わせられる構成になっています。
+
+```mermaid
+graph LR
+  tdig["tdig (CLI)"] --> tenbin_dns
+  tenbin_ex["🔒 tenbin_ex (server)"] --> tenbin_dns
+  tenbin_ex --> elixir_dnstap
+  tenbin_cache["🔒 tenbin_cache (cache proxy)"] --> tenbin_dns
+  tenbin_cache --> elixir_dnstap
+
+  tenbin_dns["tenbin_dns (packet library)"]
+  elixir_dnstap["elixir_dnstap (DNSTap logging)"]
+```
+
+> 🔒 付きのノード（`tenbin_ex` / `tenbin_cache`）は研究用途で開発中のサーバーコンポーネントで、現在は非公開です。
+
+### ユースケース別の選び方
+
+| やりたいこと | プロジェクト | 公開状況 |
+|---|---|---|
+| DNS パケットを Elixir で解析・生成したい | [**tenbin_dns**](https://github.com/smkwlab/tenbin_dns) — 19+ レコードタイプ・DNSSEC・EDNS0 対応のパース/生成ライブラリ | ✅ 公開 |
+| コマンドラインで DNS を引きたい（`dig` 互換） | [**tdig**](https://github.com/smkwlab/tdig) — dig 互換出力の CLI。ビルド済みバイナリ配布あり | ✅ 公開 |
+| DNSTap ロギングを組み込みたい | [**elixir_dnstap**](https://github.com/smkwlab/elixir_dnstap) — Frame Streams 対応の DNSTap ロギングライブラリ（Hex 公開） | ✅ 公開 |
+| ポリシーベースの DNS サーバーを動かしたい | **tenbin_ex** — 動的応答ポリシーを差し込める権威サーバー | 🔒 研究用（非公開） |
+| 透過型 DNS キャッシュプロキシが欲しい | **tenbin_cache** — 無加工転送に特化した薄いキャッシュプロキシ | 🔒 研究用（非公開） |
+
+---
+
 ## ⚙️ 共通 CI / 開発基盤
 
 複数リポジトリ・多数の学生リポジトリに共通機能を配布・運用するための仕組みです。
@@ -83,9 +83,9 @@ AtCoder への参加を VS Code 上で完結させる、学生の競技プログ
 
 各プロジェクトの README 冒頭にセットアップ・動作確認の手順を用意しています。とくに DNS/Elixir 群の README には、3 ステップで動作確認できる **Quick Start** があります。
 
-- DNS ライブラリ／ツール: [tenbin_dns](https://github.com/smkwlab/tenbin_dns) / [tdig](https://github.com/smkwlab/tdig) / [elixir_dnstap](https://github.com/smkwlab/elixir_dnstap)（各 README の Quick Start を参照）
 - LaTeX 執筆環境: [latex-environment](https://github.com/smkwlab/latex-environment) → 各テンプレート
 - 競技プログラミング: [atcoder-env](https://github.com/smkwlab/atcoder-env) を VS Code で開く
+- DNS ライブラリ／ツール: [tenbin_dns](https://github.com/smkwlab/tenbin_dns) / [tdig](https://github.com/smkwlab/tdig) / [elixir_dnstap](https://github.com/smkwlab/elixir_dnstap)（各 README の Quick Start を参照）
 
 ---
 

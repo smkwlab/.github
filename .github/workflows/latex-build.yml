@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Build and Release LaTeX Documents
-        uses: smkwlab/latex-release-action@v3
+        uses: smkwlab/latex-release-action@v3.3.0
         env:
           GH_TOKEN: ${{ github.token }}
         with:

@@ -74,7 +74,7 @@ jobs:
 
           echo "release_name=${first_file} Weekly Report" >> "$GITHUB_OUTPUT"
 
-      - uses: smkwlab/latex-release-action@v3
+      - uses: smkwlab/latex-release-action@v3.3.0
         with:
           files: ${{ needs.find-modified-tex.outputs.files }}
           release_name: ${{ steps.release-name.outputs.release_name }}

@@ -56,7 +56,7 @@ jobs:
 
     steps:
     - name: Set up Git repository
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
     - name: Set up Elixir
       uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
@@ -65,7 +65,7 @@ jobs:
         elixir-version: ${{ inputs.elixir-version-latest }}
 
     - name: Restore dependencies cache
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps
         key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
@@ -99,7 +99,7 @@ jobs:
 
     steps:
     - name: Set up Git repository
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
     - name: Set up Elixir
       uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
@@ -108,14 +108,14 @@ jobs:
         elixir-version: ${{ matrix.elixir }}
 
     - name: Restore dependencies cache
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps
         key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
         restore-keys: ${{ runner.os }}-mix-
 
     - name: Restore build cache
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: _build
         key: ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
@@ -131,7 +131,7 @@ jobs:
 
     - name: Upload coverage to Codecov
       if: matrix.primary
-      uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         # For private repositories, set CODECOV_TOKEN secret in your repository
         # See: https://docs.codecov.com/docs/github-actions#using-private-repositories
@@ -142,7 +142,7 @@ jobs:
         fail_ci_if_error: false
 
     - name: Upload coverage reports
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       if: always()
       with:
         name: coverage-${{ matrix.otp }}-${{ matrix.elixir }}
@@ -161,7 +161,7 @@ jobs:
 
     steps:
     - name: Set up Git repository
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
     - name: Set up Elixir
       uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
@@ -170,14 +170,14 @@ jobs:
         elixir-version: ${{ inputs.elixir-version-latest }}
 
     - name: Restore dependencies cache
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps
         key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
         restore-keys: ${{ runner.os }}-mix-
 
     - name: Restore PLT cache
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       id: plt_cache
       with:
         path: priv/plts
@@ -230,7 +230,7 @@ jobs:
 
     - name: Create GitHub Issue for Dialyzer failures
       if: steps.dialyzer.outputs.result == 'failure'
-      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         DIALYZER_OUTPUT: ${{ steps.read_output.outputs.dialyzer_output }}
       with:
@@ -301,7 +301,7 @@ jobs:
 
     - name: Close Dialyzer issues on success
       if: steps.dialyzer.outputs.result == 'success'
-      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         script: |
           // Close any existing Dialyzer issues if analysis passed

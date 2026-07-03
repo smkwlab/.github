@@ -58,7 +58,7 @@ jobs:
 
       - name: Gemini Review Bot
         if: steps.check-key.outputs.skip != 'true'
-        uses: toshi0806/ai-reviewer@v1
+        uses: toshi0806/ai-reviewer@1808b48b8fc0c94daa8a829b0be13326df0eff70 # v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

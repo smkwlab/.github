@@ -1,0 +1,8 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>smkwlab/.github#v1",
+    "github>smkwlab/.github:github-actions#v1"
+  ],
+  "enabledManagers": ["github-actions"]
+}

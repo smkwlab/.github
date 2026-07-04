@@ -50,7 +50,7 @@
 各リポは `smkwlab/.github` の再利用ワークフローを `@v1` で呼び出す:
 
 - **`elixir-ci.yml`** — Code Quality（format/credo）＋ **OTP/Elixir マトリクス（LTS + latest の2組）** でのテスト。coverage（Codecov）・Dialyzer も含む。
-  - 具体的な OTP/Elixir 版は各 caller の workflow が渡す（**正は caller の定義**）。実際に使われている版は各リポの CI ジョブ名「Test on OTP … / Elixir …」で確認できる。
+  - 具体的な OTP/Elixir 版は各 caller の workflow が渡す（**版の定義元は caller 側の workflow**）。実際に使われている版は各リポの CI ジョブ名「Test on OTP … / Elixir …」で確認できる。
 - **`security.yml`** — 依存監査 + trufflehog によるシークレットスキャン。
 - **`ai-review.yml`**（caller: `ai-code-review.yml`）— AI コードレビュー（`review / review` ジョブ）。
 

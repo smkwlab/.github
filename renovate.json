@@ -4,5 +4,17 @@
     "github>smkwlab/.github#v1",
     "github>smkwlab/.github:github-actions#v1"
   ],
-  "enabledManagers": ["github-actions"]
+  "enabledManagers": ["github-actions"],
+  "packageRules": [
+    {
+      "description": "Keep the html-validation Python runtime pinned (3.11 was chosen deliberately). A new Python minor may lack html5validator / tool support and CI does not exercise it here, so bump it manually rather than via the grouped auto-merge.",
+      "matchDepNames": ["python"],
+      "enabled": false
+    },
+    {
+      "description": "texlive-ja-textlint uses a custom year+revision tag (e.g. 2025g) that Renovate mis-orders (2025 is not newer than 2025g). Bump this image tag manually.",
+      "matchPackageNames": ["ghcr.io/smkwlab/texlive-ja-textlint"],
+      "enabled": false
+    }
+  ]
 }

@@ -1,7 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>smkwlab/.github#v1"],
-  "enabledManagers": ["mix"],
+  "extends": [
+    "github>smkwlab/.github#v1",
+    "github>smkwlab/.github:github-actions#v1"
+  ],
+  "enabledManagers": ["mix", "github-actions"],
   "schedule": ["before 6am on monday"],
   "lockFileMaintenance": {
     "enabled": true,

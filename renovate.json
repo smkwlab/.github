@@ -12,9 +12,10 @@
       "enabled": false
     },
     {
-      "description": "texlive-ja-textlint uses a custom year+revision tag (e.g. 2025g) that Renovate mis-orders (2025 is not newer than 2025g). Bump this image tag manually.",
+      "description": "texlive-ja-textlint uses a custom YYYY[revision-letter] tag scheme (e.g. 2025g, 2026a). The default docker versioning mis-orders it (it treated bare 2025 as newer than 2025g). Use loose versioning and restrict candidates to plain year tags so Renovate orders them correctly and ignores the alpine/debian/amd64/test/latest variants.",
       "matchPackageNames": ["ghcr.io/smkwlab/texlive-ja-textlint"],
-      "enabled": false
+      "versioning": "loose",
+      "allowedVersions": "/^20\\d{2}[a-z]?$/"
     }
   ]
 }

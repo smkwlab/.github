@@ -17,9 +17,9 @@
   - 例: `fix(parser): guard against zero-length RDATA (#120)` / `docs(README): add Quick Start`
 - **英語・命令形**（"add" であって "added"/"adds" ではない）で簡潔に。
 - **Issue 番号を含める**（`(#123)` または本文に `resolve #123`）。
-- AI 支援で作成したコミットは、末尾に共同作者トレーラを付ける慣行:
+- AI / bot 支援で作成したコミットは、その旨を `Co-Authored-By:` トレーラで明示する慣行。メールアドレス等は**使用したツールの規約に従う**（例: Renovate は `renovate[bot] <…@users.noreply.github.com>`、Claude は Anthropic の指定アドレス）:
   ```
-  Co-Authored-By: <AI モデル名> <noreply@anthropic.com>
+  Co-Authored-By: <ツール / モデル名> <ツールが指定するアドレス>
   ```
 
 ## Pull Request
@@ -29,7 +29,7 @@
 3. **すべての CI チェックが green** になること（下記「CI」参照）。
 4. レビュー指摘は、**盲信も却下もせず**、docs / 実コード / 実機動作で裏取りしてから対応する。恒常的でない LOW 指摘は根拠を添えて in-thread 返信で収束させてよい。
 5. マージは原則 **squash merge**。マージ後は作業ブランチを削除する。
-   - `smkwlab/.github` は **up-to-date-branch ルールセット**があるため、`main` が先行した PR は先にブランチ更新（`gh api -X PUT repos/OWNER/REPO/pulls/N/update-branch`）してからマージする。
+   - `smkwlab/.github` は **up-to-date-branch ルールセット**があるため、`main` が先行した PR は先にブランチ更新してからマージする（`gh pr update-branch <PR番号>`、未対応の gh バージョンなら `gh api -X PUT repos/OWNER/REPO/pulls/N/update-branch`）。
 
 ## テスト / Lint（Elixir リポ）
 
@@ -50,7 +50,7 @@
 各リポは `smkwlab/.github` の再利用ワークフローを `@v1` で呼び出す:
 
 - **`elixir-ci.yml`** — Code Quality（format/credo）＋ **OTP/Elixir マトリクス（LTS + latest の2組）** でのテスト。coverage（Codecov）・Dialyzer も含む。
-  - 具体的な OTP/Elixir 版は各 caller が渡す（源泉は caller の workflow）。現行は概ね **LTS = OTP 27 系 / Elixir 1.17 系**、**latest = OTP 29 系 / Elixir 1.20 系**。
+  - 具体的な OTP/Elixir 版は各 caller の workflow が渡す（**正は caller の定義**）。実際に使われている版は各リポの CI ジョブ名「Test on OTP … / Elixir …」で確認できる。
 - **`security.yml`** — 依存監査 + trufflehog によるシークレットスキャン。
 - **`ai-review.yml`**（caller: `ai-code-review.yml`）— AI コードレビュー（`review / review` ジョブ）。
 

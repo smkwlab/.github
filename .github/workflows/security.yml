@@ -85,7 +85,7 @@ jobs:
         fetch-depth: 0
 
     - name: Scan for secrets in codebase
-      uses: trufflesecurity/trufflehog@ddc015e5ed99942b2253d8ea16a0586a01ef2ab1 # v3.88.0
+      uses: trufflesecurity/trufflehog@00155c9dc586f34d189adc83d3ac2698c2ec551f # v3.95.8
       with:
         path: ./
         base: ${{ github.event.before || 'HEAD~1' }}

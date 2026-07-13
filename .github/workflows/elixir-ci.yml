@@ -58,11 +58,16 @@ jobs:
     - name: Set up Git repository
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+    # Quality checks (format / compile / credo) run on the LTS lane: credo 1.7.x
+    # crashes tokenizing regex sigils (~r/.../) on newer Elixir (smkwlab/.github#94),
+    # and credo's version is controlled by each caller's mix.lock, not this
+    # workflow. Real latest-Elixir compatibility is still covered by the test
+    # matrix below (which compiles and tests on the latest lane).
     - name: Set up Elixir
       uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
       with:
-        otp-version: ${{ inputs.otp-version-latest }}
-        elixir-version: ${{ inputs.elixir-version-latest }}
+        otp-version: ${{ inputs.otp-version-lts }}
+        elixir-version: ${{ inputs.elixir-version-lts }}
 
     - name: Restore dependencies cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

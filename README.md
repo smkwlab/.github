@@ -23,6 +23,7 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | Workflow | 説明 | 用途 |
 |----------|------|------|
 | `create-next-draft.yml` | PR 作成時に次の draft ブランチを自動作成 | 卒論・ISE レポート |
+| `sync-next-draft.yml` | draft ブランチへの push（suggestion 受け入れ等）を後続の draft ブランチへ自動 merge | 卒論・ISE レポート |
 | `prevent-draft-merge.yml` | draft ブランチの誤マージを防止 | 卒論・ISE レポート |
 | `auto-final-merge.yml` | final-* タグ push 時に承認済み PR を自動マージ | 卒論テンプレート |
 | `ai-review.yml` | ワンショット LLM（Claude/Gemini）による PR 自動レビュー（CODE / ACADEMIC） | 全テンプレート |
@@ -384,9 +385,40 @@ draft ブランチからの PR 作成時に、次の draft ブランチを自動
 - `abstract-1st` → `abstract-2nd` → ...
 - `0th-draft` → `1st-draft`
 
+### sync-next-draft.yml
+
+draft ブランチへ push されたコミット（レビュー PR で suggestion を受け入れた場合を含む）を、後続の draft ブランチへ連鎖的に自動 merge します。PR 作成時に次稿ブランチが先行作成されるため、その後に受け入れた suggestion が次稿に反映されない問題（sotsuron-template#110）への対応です。
+
+**動作:**
+
+- `1st-draft` への push → `2nd-draft` が存在すれば merge → `3rd-draft` … と存在する限り伝播（GITHUB_TOKEN による push は新しい workflow run を発火しないため、1 回の実行でチェーン全体を処理）
+- コンフリクト時: 前稿→次稿の同期 PR（例: head `1st-draft` / base `2nd-draft`）を自動作成し、前稿のレビュー PR へコメントで通知。学生はブラウザの「Resolve conflicts」で解決して同期 PR を merge する（`prevent-draft-merge.yml` は draft→draft の同期 PR を許可）
+- 成功時は PR コメントしない（Actions の step summary にのみ記録）
+
+**caller 例:**
+
+```yaml
+name: Sync Suggestions to Next Draft
+on:
+  push:
+    branches:
+      - '*-draft'
+      - 'abstract-*'
+
+jobs:
+  sync:
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: smkwlab/.github/.github/workflows/sync-next-draft.yml@v1
+```
+
+> [!NOTE]
+> `push` トリガーは **push されたブランチ上の**ワークフローファイルを参照します。既存リポジトリへ配布する際は default branch だけでなく、既存の draft ブランチにも caller を配置してください（`registry-manager propagate-workflow` 等で伝播）。
+
 ### prevent-draft-merge.yml
 
-draft ブランチの誤マージを防止します。`final-*` タグが付いている場合のみマージを許可。
+draft ブランチの誤マージを防止します。`final-*` タグが付いている場合のみマージを許可。また、base も draft ブランチである同期 PR（`sync-next-draft.yml` がコンフリクト時に作成）はマージを許可します。
 
 ### auto-final-merge.yml
 

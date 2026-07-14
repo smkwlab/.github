@@ -75,13 +75,16 @@ jobs:
 
           # Allow draft-to-draft sync PRs (e.g. created by
           # sync-next-draft.yml to carry accepted review suggestions
-          # into the next draft branch)
+          # into the next draft branch). Both head and base must match
+          # a draft pattern.
           echo "::debug::Base branch: $BASE_REF"
-          if [[ "$BASE_REF" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]] || \
-             [[ "$BASE_REF" =~ ^abstract-[0-9]+(st|nd|rd|th)$ ]]; then
+          if { [[ "$BRANCH_NAME" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]] || \
+               [[ "$BRANCH_NAME" =~ ^abstract-[0-9]+(st|nd|rd|th)$ ]]; } && \
+             { [[ "$BASE_REF" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]] || \
+               [[ "$BASE_REF" =~ ^abstract-[0-9]+(st|nd|rd|th)$ ]]; }; then
             { echo "is_draft=false"; echo "draft_type=sync"; } >> "$GITHUB_OUTPUT"
             echo "Draft-to-draft sync PR - merge allowed"
-            echo "::notice::Base branch is a draft branch ($BASE_REF) - sync PR"
+            echo "::notice::Head and base are both draft branches - sync PR"
             exit 0
           fi
 

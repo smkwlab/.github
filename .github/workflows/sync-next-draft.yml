@@ -96,8 +96,11 @@ jobs:
           # Merge "from" into "into" and push; retry once on push race.
           # Returns 1 on merge conflict, 2 when the push keeps failing.
           sync_pair() {
-            local from="$1" into="$2" attempt
-            for attempt in 1 2; do
+            local from="$1" into="$2"
+            for _ in 1 2; do
+              # (Re)start from the freshly fetched remote state; on a
+              # retry after a rejected push, checkout -B discards the
+              # previous local merge and redoes it on the new tip
               git fetch origin \
                 "+refs/heads/$from:refs/remotes/origin/$from" \
                 "+refs/heads/$into:refs/remotes/origin/$into"
@@ -143,17 +146,19 @@ jobs:
               --json number --jq '.[0].number // empty')
 
             if [ -z "$sync_pr" ]; then
-              gh pr create --base "$into" --head "$from" \
+              local pr_url
+              pr_url=$(gh pr create --base "$into" --head "$from" \
                 --title "Sync review suggestions from $from into $into" \
-                --body "$(conflict_pr_body "$from" "$into")"
-              sync_pr=$(gh pr list --head "$from" --base "$into" --state open \
-                --json number --jq '.[0].number // empty')
+                --body "$(conflict_pr_body "$from" "$into")")
+              sync_pr="${pr_url##*/}"
             fi
 
+            # The review PR of "from" is the open PR whose base is not a
+            # draft branch (draft-based PRs are sync PRs, also mid-chain)
             local review_pr
             review_pr=$(gh pr list --head "$from" --state open \
               --json number,baseRefName \
-              --jq "[.[] | select(.baseRefName != \"$into\")][0].number // empty")
+              --jq '[.[] | select(.baseRefName | test("^[0-9]+(st|nd|rd|th)-draft$|^abstract-[0-9]+(st|nd|rd|th)$") | not)][0].number // empty')
             if [ -n "$review_pr" ]; then
               gh pr comment "$review_pr" --body "受け入れた suggestion を「$into」へ自動 merge できませんでした（コンフリクト）。同期 PR #$sync_pr を開き、「Resolve conflicts」で解決してから merge してください。"
             fi

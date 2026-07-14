@@ -1,4 +1,3 @@
----
 # Reusable Workflow: Prevent Draft Branch Merge
 #
 # This workflow prevents accidental merging of draft branches.
@@ -44,6 +43,7 @@ jobs:
         id: check-draft
         env:
           HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           set -e
 
@@ -71,6 +71,21 @@ jobs:
               echo "::notice::Final submission tag: $FINAL_TAG"
               exit 0
             fi
+          fi
+
+          # Allow draft-to-draft sync PRs (e.g. created by
+          # sync-next-draft.yml to carry accepted review suggestions
+          # into the next draft branch). Both head and base must match
+          # a draft pattern.
+          echo "::debug::Base branch: $BASE_REF"
+          if { [[ "$BRANCH_NAME" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]] || \
+               [[ "$BRANCH_NAME" =~ ^abstract-[0-9]+(st|nd|rd|th)$ ]]; } && \
+             { [[ "$BASE_REF" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]] || \
+               [[ "$BASE_REF" =~ ^abstract-[0-9]+(st|nd|rd|th)$ ]]; }; then
+            { echo "is_draft=false"; echo "draft_type=sync"; } >> "$GITHUB_OUTPUT"
+            echo "Draft-to-draft sync PR - merge allowed"
+            echo "::notice::Head and base are both draft branches - sync PR"
+            exit 0
           fi
 
           # Branch name validation
@@ -132,6 +147,7 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           IS_FINAL: ${{ steps.check-draft.outputs.is_final_submission }}
           FINAL_TAG: ${{ steps.check-draft.outputs.final_tag }}
+          DRAFT_TYPE: ${{ steps.check-draft.outputs.draft_type }}
         run: |
           BRANCH_NAME="$HEAD_REF"
 
@@ -139,6 +155,9 @@ jobs:
             echo "Final submission branch - merge allowed"
             echo "Branch name: $BRANCH_NAME"
             echo "Final submission tag: $FINAL_TAG"
+          elif [[ "$DRAFT_TYPE" == "sync" ]]; then
+            echo "Draft-to-draft sync PR - merge allowed"
+            echo "Branch name: $BRANCH_NAME"
           else
             echo "Regular branch - merge allowed"
             echo "Branch name: $BRANCH_NAME"

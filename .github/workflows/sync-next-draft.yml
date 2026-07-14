@@ -1,0 +1,211 @@
+# Reusable Workflow: Sync Next Draft Branch
+#
+# When commits are pushed to a draft branch (e.g. a student accepts
+# review suggestions on its PR), this workflow merges them into the
+# following draft branch(es) so students always continue writing on
+# top of the reviewed text.
+#
+# Pushes made with GITHUB_TOKEN do not trigger new workflow runs, so a
+# single run walks the whole chain (1st-draft -> 2nd-draft -> ...).
+# On merge conflict, it opens a draft-to-draft sync PR (resolvable in
+# the browser) and notifies the review PR of the pushed branch.
+#
+# Use this from other repositories with:
+#
+#   on:
+#     push:
+#       branches:
+#         - '*-draft'
+#         - 'abstract-*'
+#   jobs:
+#     sync:
+#       permissions:
+#         contents: write
+#         pull-requests: write
+#       uses: smkwlab/.github/.github/workflows/sync-next-draft.yml@v1
+#
+name: Sync Next Draft Branch
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-next-branch:
+    runs-on: ubuntu-latest
+
+    # Defensive guard against bot loops (GITHUB_TOKEN pushes do not
+    # trigger workflows in the first place)
+    if: github.actor != 'github-actions[bot]'
+
+    concurrency:
+      group: sync-next-draft-${{ github.repository }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync pushed changes into following draft branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUSHED_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -eu
+
+          # Ordinal suffix for a number (1 -> 1st, 2 -> 2nd, ...)
+          ordinal() {
+            local n="$1"
+            local last_two=$((n % 100))
+            local last_one=$((n % 10))
+            if [[ $last_two -ge 11 && $last_two -le 13 ]]; then
+              echo "${n}th"
+            elif [[ $last_one -eq 1 ]]; then
+              echo "${n}st"
+            elif [[ $last_one -eq 2 ]]; then
+              echo "${n}nd"
+            elif [[ $last_one -eq 3 ]]; then
+              echo "${n}rd"
+            else
+              echo "${n}th"
+            fi
+          }
+
+          # Draft branch following the given one (empty if no draft pattern)
+          next_branch() {
+            local branch="$1"
+            if [[ "$branch" =~ ^([0-9]+)(st|nd|rd|th)-draft$ ]]; then
+              # Also covers the 0th-draft -> 1st-draft special case
+              echo "$(ordinal $((BASH_REMATCH[1] + 1)))-draft"
+            elif [[ "$branch" =~ ^abstract-([0-9]+)(st|nd|rd|th)$ ]]; then
+              echo "abstract-$(ordinal $((BASH_REMATCH[1] + 1)))"
+            fi
+          }
+
+          # Merge "from" into "into" and push; retry once on push race.
+          # Returns 1 on merge conflict, 2 when the push keeps failing.
+          sync_pair() {
+            local from="$1" into="$2"
+            for _ in 1 2; do
+              # (Re)start from the freshly fetched remote state; on a
+              # retry after a rejected push, checkout -B discards the
+              # previous local merge and redoes it on the new tip
+              git fetch origin \
+                "+refs/heads/$from:refs/remotes/origin/$from" \
+                "+refs/heads/$into:refs/remotes/origin/$into"
+              git checkout -B "$into" "origin/$into"
+              if ! git merge --no-edit -m "Merge $from into $into (sync review suggestions)" "origin/$from"; then
+                git merge --abort || true
+                return 1
+              fi
+              if git push origin "$into"; then
+                return 0
+              fi
+              echo "Push of $into was rejected (concurrent update), retrying..."
+            done
+            return 2
+          }
+
+          conflict_pr_body() {
+            local from="$1" into="$2"
+            cat <<EOF
+          ## 前稿の変更を自動で取り込めませんでした
+
+          「$from」で受け入れた suggestion（レビューでの修正）を「$into」へ自動 merge しようとしましたが、同じ箇所が両方のブランチで編集されているため、自動では取り込めませんでした。
+
+          ### 対応手順（ブラウザだけで完結します）
+
+          1. この PR の下部にある **Resolve conflicts** ボタンを押す
+          2. エディタで \`<<<<<<<\` から \`>>>>>>>\` までの箇所を探し、残したい文になるように編集する
+          3. **Mark as resolved** を押してから **Commit merge** を押す
+          4. この PR を **Merge pull request** で merge する（この同期 PR は merge してかまいません）
+
+          merge が完了すると、以降の suggestion は再び自動で「$into」へ取り込まれます。
+          EOF
+          }
+
+          # On conflict: open a draft-to-draft sync PR and notify the
+          # review PR of the pushed branch.
+          handle_conflict() {
+            local from="$1" into="$2"
+            echo "::warning::Merge conflict while syncing $from into $into"
+
+            local sync_pr
+            sync_pr=$(gh pr list --head "$from" --base "$into" --state open \
+              --json number --jq '.[0].number // empty')
+
+            if [ -z "$sync_pr" ]; then
+              local pr_url
+              pr_url=$(gh pr create --base "$into" --head "$from" \
+                --title "Sync review suggestions from $from into $into" \
+                --body "$(conflict_pr_body "$from" "$into")")
+              sync_pr="${pr_url##*/}"
+            fi
+
+            # The review PR of "from" is the open PR whose base is not a
+            # draft branch (draft-based PRs are sync PRs, also mid-chain)
+            local review_pr
+            review_pr=$(gh pr list --head "$from" --state open \
+              --json number,baseRefName \
+              --jq '[.[] | select(.baseRefName | test("^[0-9]+(st|nd|rd|th)-draft$|^abstract-[0-9]+(st|nd|rd|th)$") | not)][0].number // empty')
+            if [ -n "$review_pr" ]; then
+              gh pr comment "$review_pr" --body "受け入れた suggestion を「$into」へ自動 merge できませんでした（コンフリクト）。同期 PR #$sync_pr を開き、「Resolve conflicts」で解決してから merge してください。"
+            fi
+
+            {
+              echo "## Sync stopped by merge conflict"
+              echo ""
+              echo "- $from -> $into: conflict, see sync PR #$sync_pr"
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          current="$PUSHED_BRANCH"
+          synced=""
+
+          while true; do
+            next="$(next_branch "$current")"
+            if [ -z "$next" ]; then
+              echo "::notice::No next draft branch pattern for $current; done"
+              break
+            fi
+            if ! git ls-remote --exit-code --heads origin "$next" > /dev/null; then
+              echo "::notice::Next draft branch $next does not exist; done"
+              break
+            fi
+
+            status=0
+            sync_pair "$current" "$next" || status=$?
+
+            if [ "$status" -eq 1 ]; then
+              handle_conflict "$current" "$next"
+              exit 0
+            elif [ "$status" -ne 0 ]; then
+              echo "::error::Could not push $next (kept failing due to concurrent updates)"
+              exit 1
+            fi
+
+            echo "Synced $current -> $next"
+            synced="$synced $next"
+            current="$next"
+          done
+
+          if [ -n "$synced" ]; then
+            {
+              echo "## Synced draft branches"
+              echo ""
+              for b in $synced; do
+                echo "- $b"
+              done
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

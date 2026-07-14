@@ -73,18 +73,31 @@ jobs:
             fi
           fi
 
-          # Allow draft-to-draft sync PRs (e.g. created by
-          # sync-next-draft.yml to carry accepted review suggestions
-          # into the next draft branch). Both head and base must match
-          # a draft pattern.
+          # Allow draft-to-draft sync PRs created by sync-next-draft.yml:
+          # the base must be exactly the NEXT draft of the head branch
+          # (e.g. head 1st-draft -> base 2nd-draft). Review PRs go in the
+          # opposite direction (e.g. head 2nd-draft -> base 1st-draft)
+          # and stay blocked.
           echo "::debug::Base branch: $BASE_REF"
-          if { [[ "$BRANCH_NAME" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]] || \
-               [[ "$BRANCH_NAME" =~ ^abstract-[0-9]+(st|nd|rd|th)$ ]]; } && \
-             { [[ "$BASE_REF" =~ ^[0-9]+(st|nd|rd|th)-draft$ ]] || \
-               [[ "$BASE_REF" =~ ^abstract-[0-9]+(st|nd|rd|th)$ ]]; }; then
+          ordinal() {
+            local n="$1" last_two last_one
+            last_two=$((n % 100)); last_one=$((n % 10))
+            if [[ $last_two -ge 11 && $last_two -le 13 ]]; then echo "${n}th"
+            elif [[ $last_one -eq 1 ]]; then echo "${n}st"
+            elif [[ $last_one -eq 2 ]]; then echo "${n}nd"
+            elif [[ $last_one -eq 3 ]]; then echo "${n}rd"
+            else echo "${n}th"; fi
+          }
+          NEXT_OF_HEAD=""
+          if [[ "$BRANCH_NAME" =~ ^([0-9]+)(st|nd|rd|th)-draft$ ]]; then
+            NEXT_OF_HEAD="$(ordinal $((BASH_REMATCH[1] + 1)))-draft"
+          elif [[ "$BRANCH_NAME" =~ ^abstract-([0-9]+)(st|nd|rd|th)$ ]]; then
+            NEXT_OF_HEAD="abstract-$(ordinal $((BASH_REMATCH[1] + 1)))"
+          fi
+          if [ -n "$NEXT_OF_HEAD" ] && [ "$BASE_REF" = "$NEXT_OF_HEAD" ]; then
             { echo "is_draft=false"; echo "draft_type=sync"; } >> "$GITHUB_OUTPUT"
             echo "Draft-to-draft sync PR - merge allowed"
-            echo "::notice::Head and base are both draft branches - sync PR"
+            echo "::notice::Base ($BASE_REF) is the next draft of head ($BRANCH_NAME) - sync PR"
             exit 0
           fi
 

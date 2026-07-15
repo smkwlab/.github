@@ -153,12 +153,14 @@ jobs:
               sync_pr="${pr_url##*/}"
             fi
 
-            # The review PR of "from" is the open PR whose base is not a
-            # draft branch (draft-based PRs are sync PRs, also mid-chain)
+            # The review PR of "from" is the open PR other than the sync
+            # PR itself. Note: its base may also be a draft branch (review
+            # PRs of 2nd and later drafts are based on the previous draft),
+            # so we only exclude the sync target here.
             local review_pr
             review_pr=$(gh pr list --head "$from" --state open \
               --json number,baseRefName \
-              --jq '[.[] | select(.baseRefName | test("^[0-9]+(st|nd|rd|th)-draft$|^abstract-[0-9]+(st|nd|rd|th)$") | not)][0].number // empty')
+              --jq "[.[] | select(.baseRefName != \"$into\")][0].number // empty")
             if [ -n "$review_pr" ]; then
               gh pr comment "$review_pr" --body "受け入れた suggestion を「$into」へ自動 merge できませんでした（コンフリクト）。同期 PR #$sync_pr を開き、「Resolve conflicts」で解決してから merge してください。"
             fi

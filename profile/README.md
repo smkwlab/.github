@@ -11,13 +11,13 @@
 
 ## 📄 文書作成エコシステム（LaTeX / HTML）
 
-卒業論文・修士論文・ポスターを LaTeX で、情報科学演習レポートを HTML で——再現性のある環境で作成し、PR ベースのレビューと自動ビルドに載せるための基盤です。
+卒業論文・修士論文・ポスターを LaTeX で、情報科学演習レポートを HTML で——再現性のある環境で作成し、draft PR サイクルによる添削と自動ビルドに載せるための基盤です。draft PR サイクルとは、draft ブランチで執筆し、Pull Request で添削を受け、自動作成される次稿ブランチで改稿を続ける繰り返しのことです。
 
 | プロジェクト | 役割 |
 |---|---|
-| [latex-template](https://github.com/smkwlab/latex-template) | 汎用 LaTeX ドキュメントテンプレート |
+| [latex-template](https://github.com/smkwlab/latex-template) | 汎用 LaTeX ドキュメントテンプレート（draft PR サイクルはオプション） |
 | [ise-report-template](https://github.com/smkwlab/ise-report-template) | 情報科学演習レポート用テンプレート（HTML5） |
-| [sotsuron-template](https://github.com/smkwlab/sotsuron-template) | 卒業論文テンプレート（draft ブランチ運用） |
+| [sotsuron-template](https://github.com/smkwlab/sotsuron-template) | 卒業論文・修士論文の統合テンプレート |
 | [poster-template](https://github.com/smkwlab/poster-template) | 学会発表用 A0 ポスターテンプレート（tikzposter・日本語対応） |
 | [split-sentences](https://github.com/smkwlab/split-sentences) | LaTeX 文書を 1 文 1 行に整形し diff を見やすくするツール |
 | [texlive-ja-textlint](https://github.com/smkwlab/texlive-ja-textlint) | 日本語 LaTeX コンパイル用の Docker イメージ（TeX Live + textlint）。下記環境の土台 |
@@ -25,6 +25,10 @@
 | [aldc](https://github.com/smkwlab/aldc) | 既存テンプレートに LaTeX 用 Dev Container を追加する CLI ツール |
 | [latex-release-action](https://github.com/smkwlab/latex-release-action) | LaTeX ビルド & PDF リリースを自動化する GitHub Action |
 | [latex-ecosystem](https://github.com/smkwlab/latex-ecosystem) | LaTeX テンプレート群とツールの全体管理 |
+| [student-repo-management](https://github.com/smkwlab/student-repo-management) | 学生リポジトリの作成（setup.sh）とブランチ保護設定の自動化 |
+| [registry-manager](https://github.com/smkwlab/registry-manager) | 学生リポジトリレジストリの管理 CLI（Elixir escript） |
+| [thesis-monitor](https://github.com/smkwlab/thesis-monitor) | 学生リポジトリの執筆進捗モニタリングツール（Elixir escript） |
+| [ecosystem-manager](https://github.com/smkwlab/ecosystem-manager) | エコシステム全リポジトリの横断ステータス確認ツール（Elixir escript） |
 
 ---
 
@@ -76,6 +80,7 @@ graph LR
 | プロジェクト | 役割 |
 |---|---|
 | [.github](https://github.com/smkwlab/.github) | org 共通の Reusable Workflows（CI・LaTeX ビルド・AI レビュー・メーリングリスト通知 等）と community health files |
+| [ai-academic-paper-reviewer](https://github.com/smkwlab/ai-academic-paper-reviewer) | 論文・コードの Pull Request を対象とした AI レビュー GitHub Action（ACADEMIC / CODE の 2 モード） |
 
 ---
 

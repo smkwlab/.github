@@ -15,15 +15,15 @@
 
 | プロジェクト | 役割 |
 |---|---|
-| [latex-template](https://github.com/smkwlab/latex-template) | 汎用 LaTeX ドキュメントテンプレート（draft PR サイクルはオプション） |
-| [ise-report-template](https://github.com/smkwlab/ise-report-template) | 情報科学演習レポート用テンプレート（HTML5） |
 | [sotsuron-template](https://github.com/smkwlab/sotsuron-template) | 卒業論文・修士論文の統合テンプレート |
+| [ise-report-template](https://github.com/smkwlab/ise-report-template) | 情報科学演習レポート用テンプレート（HTML5） |
 | [poster-template](https://github.com/smkwlab/poster-template) | 学会発表用 A0 ポスターテンプレート（tikzposter・日本語対応） |
-| [split-sentences](https://github.com/smkwlab/split-sentences) | LaTeX 文書を 1 文 1 行に整形し diff を見やすくするツール |
+| [latex-template](https://github.com/smkwlab/latex-template) | 汎用 LaTeX ドキュメントテンプレート（draft PR サイクルはオプション） |
 | [texlive-ja-textlint](https://github.com/smkwlab/texlive-ja-textlint) | 日本語 LaTeX コンパイル用の Docker イメージ（TeX Live + textlint）。下記環境の土台 |
 | [latex-environment](https://github.com/smkwlab/latex-environment) | Dev Container ベースの再現可能な TeX 執筆環境（各テンプレートに組み込まれ自動的に使われる） |
 | [aldc](https://github.com/smkwlab/aldc) | 既存テンプレートに LaTeX 用 Dev Container を追加する CLI ツール |
 | [latex-release-action](https://github.com/smkwlab/latex-release-action) | LaTeX ビルド & PDF リリースを自動化する GitHub Action |
+| [split-sentences](https://github.com/smkwlab/split-sentences) | LaTeX 文書を 1 文 1 行に整形し diff を見やすくするツール |
 | [latex-ecosystem](https://github.com/smkwlab/latex-ecosystem) | LaTeX テンプレート群とツールの全体管理 |
 | [student-repo-management](https://github.com/smkwlab/student-repo-management) | 学生リポジトリの作成（setup.sh）とブランチ保護設定の自動化 |
 | [registry-manager](https://github.com/smkwlab/registry-manager) | 学生リポジトリレジストリの管理 CLI（Elixir escript） |

@@ -37,8 +37,41 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # 2 so a pull request's merge commit brings both parents along:
+          # HEAD^1 (the base head) enables the changed-files diff below.
+          # Harmless for tag builds.
+          fetch-depth: 2
+
+      # Skip building pull requests whose changes cannot affect the PDFs
+      # (currently: every changed file is Markdown). The policy lives here in
+      # the reusable -- NOT as paths-ignore on the callers -- so that one
+      # place governs every repository (existing student repositories
+      # included, via the v1 moving tag) and so that it stays compatible with
+      # required status checks: a run whose build step is skipped still
+      # reports success, whereas a workflow filtered out by paths-ignore
+      # leaves a required check pending forever.
+      - name: Check whether the changes can affect the PDFs
+        id: relevance
+        if: github.event_name == 'pull_request'
+        run: |
+          # Fail open: when the diff cannot be computed, build.
+          if ! changed=$(git diff --name-only HEAD^1 HEAD --); then
+            echo "Could not determine changed files; building to be safe."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          non_md=$(printf '%s\n' "$changed" | grep -v '\.md$' || true)
+          if [ -n "$non_md" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only Markdown files changed; skipping the LaTeX build."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build and Release LaTeX Documents
+        # Skip only on an explicit "false" (fail open on anything unexpected)
+        if: github.event_name != 'pull_request' || steps.relevance.outputs.build != 'false'
         uses: smkwlab/latex-release-action@v3.3.0
         env:
           GH_TOKEN: ${{ github.token }}

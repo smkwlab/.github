@@ -1,0 +1,23 @@
+# Caller template: Build and Release PDF — calls the latex-build reusable
+# (all-PR build style: every listed document is built on each PR; a tag push
+# creates a release with the PDFs attached).
+# Distributed by scripts/distribute-workflow.sh as
+# .github/workflows/latex-build.yml in each target repository.
+# The FILES token is the comma-separated list of documents to build (without
+# .tex extension). It has no default on purpose: pass it explicitly, e.g.
+#   --var FILES="sotsuron, gaiyou, thesis, abstract"
+name: Build and Release PDF
+
+on:
+  pull_request:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    uses: smkwlab/.github/.github/workflows/latex-build.yml@__REF__
+    permissions:
+      contents: write
+    with:
+      files: "__FILES__"

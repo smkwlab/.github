@@ -43,7 +43,9 @@
 #   --update              Overwrite an existing caller when its content differs
 #                         from the rendered template (default: skip existing).
 #   --direct              Commit straight to the default branch instead of a PR.
-#   --branch <name>       PR branch name (default: add-<caller>).
+#   --branch <name>       PR branch name (default: distribute-<caller>; one run
+#                         may add in some repos and update in others, so the
+#                         default names the action, not the verb).
 #   --list-callers        List available caller templates and exit.
 #   --list-candidates     List non-archived smkwlab repos and exit.
 #   -h, --help            Show this help.
@@ -116,7 +118,7 @@ TEMPLATE="${CALLERS_DIR}/${CALLER}.yml"
 WORKFLOW_PATH=".github/workflows/${CALLER}.yml"
 NOTE_FILE="${CALLERS_DIR}/${CALLER}.pr-note.md"
 DEFAULTS_FILE="${CALLERS_DIR}/${CALLER}.defaults"
-[[ -n "$PR_BRANCH" ]] || PR_BRANCH="add-${CALLER}"
+[[ -n "$PR_BRANCH" ]] || PR_BRANCH="distribute-${CALLER}"
 
 # Collect token substitutions: CLI --var/--model/--language first (highest
 # precedence), then the caller's optional .defaults, then --ref. sed applies
@@ -191,7 +193,7 @@ for raw in "${REPOS[@]}"; do
   verb="add"
   file_sha=""
   if meta=$(gh api "repos/${repo}/contents/${WORKFLOW_PATH}?ref=${default_branch}" \
-      --jq '.sha + " " + (.content | gsub("\\n"; ""))' 2>/dev/null); then
+      --jq '.sha + " " + (.content | gsub("[\\r\\n]"; ""))' 2>/dev/null); then
     if [[ $UPDATE != true ]]; then
       echo "  • already has ${WORKFLOW_PATH} — skipping (--update to overwrite)"; skipped=$((skipped+1)); continue
     fi

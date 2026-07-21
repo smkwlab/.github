@@ -1,0 +1,18 @@
+# Caller template: Build Modified PDFs — calls the latex-build-modified
+# reusable (modified-push build style: each push builds only the .tex files it
+# changed; no PR builds). Suits repositories that accumulate documents over
+# time without a PR cycle, e.g. weekly reports.
+# Distributed by scripts/distribute-workflow.sh as
+# .github/workflows/latex-build-modified.yml in each target repository.
+name: Build Modified PDFs
+
+on:
+  push:
+    paths:
+      - '**.tex'
+
+jobs:
+  build:
+    uses: smkwlab/.github/.github/workflows/latex-build-modified.yml@__REF__
+    permissions:
+      contents: write

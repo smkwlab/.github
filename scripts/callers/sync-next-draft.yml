@@ -1,0 +1,19 @@
+# Caller template: Sync Suggestions to Next Draft — calls the sync-next-draft
+# reusable. Part of the draft PR cycle; dormant in repositories without
+# draft-named branches (the on: filter only matches draft branches).
+# Distributed by scripts/distribute-workflow.sh as
+# .github/workflows/sync-next-draft.yml in each target repository.
+name: Sync Suggestions to Next Draft
+
+on:
+  push:
+    branches:
+      - '*-draft'
+      - 'abstract-*'
+
+jobs:
+  sync:
+    uses: smkwlab/.github/.github/workflows/sync-next-draft.yml@__REF__
+    permissions:
+      contents: write        # merge push to the next draft branch
+      pull-requests: write   # sync PR creation on conflict

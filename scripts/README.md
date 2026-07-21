@@ -21,6 +21,13 @@ smkwlab organization 運用補助スクリプト。
 | `ai-code-review` | `.github/workflows/ai-code-review.yml` | PR 自動コードレビュー（ワンショット・inline。Gemini/Claude） | org secret `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` |
 | `ai-paper-review` | `.github/workflows/ai-paper-review.yml` | PR 自動論文レビュー（ワンショット・要約。Gemini/Claude） | org secret `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` |
 | `claude-mention` | `.github/workflows/claude-mention.yml` | `@claude` 対話・修正依頼 | org secret `ANTHROPIC_API_KEY` |
+| `claude-qa` | `.github/workflows/claude-qa.yml` | `@claude` 質問応答（回答のみ・修正なし） | org secret `ANTHROPIC_API_KEY` |
+| `latex-build` | `.github/workflows/latex-build.yml` | PR で対象文書一式をビルド、タグでリリース作成 | `--var FILES="..."` の明示指定（既定なし） |
+| `latex-build-modified` | `.github/workflows/latex-build-modified.yml` | push で変更された .tex だけビルド（週報向け） | なし |
+| `create-next-draft` | `.github/workflows/create-next-draft.yml` | draft PR 作成時に次稿ブランチを自動作成 | draft ブランチ運用（無ければ休眠） |
+| `prevent-draft-merge` | `.github/workflows/prevent-draft-merge.yml` | draft PR の誤マージ防止 | draft ブランチ運用（無ければ休眠） |
+| `sync-next-draft` | `.github/workflows/sync-next-draft.yml` | 適用済み Suggestion を次稿ブランチへ伝播 | draft ブランチ運用（無ければ休眠） |
+| `notify-ml-on-pr` | `.github/workflows/notify-ml-on-pr.yml` | PR 作成を研究室 ML へメール通知 | org secret `SMTP_*` / `LAB_ML_ADDRESS`（6 種） |
 
 `scripts/distribute-workflow.sh --list-callers` で一覧できます。各 caller の前提は
 `scripts/callers/<caller>.pr-note.md`（PR 本文に付く注記）にも書かれています。
@@ -29,7 +36,7 @@ smkwlab organization 運用補助スクリプト。
 
 - **明示したリポジトリにのみ作用**します（org 全体への一括適用はしません）
 - **既定は dry-run**。実際に変更するには `--apply` が必要
-- **冪等**: 既に caller があるリポジトリはスキップ
+- **冪等**: 既に caller があるリポジトリはスキップ。`--update` を付けると、内容がテンプレートの描画結果と**異なる場合のみ**上書きします（一致していればスキップのままなので、繰り返し実行しても収束します）
 - **既定は Pull Request 配布**（`--direct` でデフォルトブランチへ直接コミット）
 
 ### 前提

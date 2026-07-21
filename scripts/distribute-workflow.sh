@@ -15,7 +15,9 @@
 # Design goals: safe by default.
 #   - Operates ONLY on repositories you name explicitly (no org-wide blast).
 #   - Dry-run by default; you must pass --apply to make any change.
-#   - Idempotent: skips a repo that already has the caller.
+#   - Idempotent: skips a repo that already has the caller. With --update,
+#     an existing caller is overwritten instead — but only when its content
+#     differs from the rendered template, so re-runs still converge to skips.
 #   - Delivers via Pull Request by default (--direct to commit to the default
 #     branch, e.g. for repos without branch protection).
 #
@@ -38,6 +40,8 @@
 #                         Repeatable. Lets a caller expose arbitrary knobs.
 #   --model <m>           Convenience alias for --var MODEL=<m>.
 #   --language <lang>     Convenience alias for --var LANGUAGE=<lang>.
+#   --update              Overwrite an existing caller when its content differs
+#                         from the rendered template (default: skip existing).
 #   --direct              Commit straight to the default branch instead of a PR.
 #   --branch <name>       PR branch name (default: add-<caller>).
 #   --list-callers        List available caller templates and exit.
@@ -60,6 +64,7 @@ CALLERS_DIR="${SCRIPT_DIR}/callers"
 APPLY=false
 REF="v1"
 DIRECT=false
+UPDATE=false
 PR_BRANCH=""
 declare -a VARS=()   # "KEY=VALUE" substitutions for __KEY__ tokens
 
@@ -91,6 +96,7 @@ while [[ $# -gt 0 ]]; do
     --model) VARS+=("MODEL=${2:?--model needs a value}"); shift 2 ;;
     --language) VARS+=("LANGUAGE=${2:?--language needs a value}"); shift 2 ;;
     --direct) DIRECT=true; shift ;;
+    --update) UPDATE=true; shift ;;
     --branch) PR_BRANCH="${2:?--branch needs a value}"; shift 2 ;;
     --list-callers) list_callers; exit 0 ;;
     --list-candidates) list_candidates; exit 0 ;;
@@ -148,9 +154,12 @@ for f in "$TEMPLATE" "$NOTE_FILE"; do
   [[ -z "${leftover// /}" ]] || die "$(basename "$f") has unsubstituted tokens: ${leftover}(provide them via --var / --model / --language or a ${CALLER}.defaults file)"
 done
 
-PR_TITLE="ci: add ${CALLER} caller"
+# Verb depends on whether the target already has the caller (see loop below):
+# "add" for a new file, "update" when --update overwrites an existing one.
+pr_title() { echo "ci: ${1} ${CALLER} caller"; }
 pr_body() {
-  echo "Adds the shared \`${CALLER}\` workflow as a caller of \`${ORG}/.github/${WORKFLOW_PATH}@${REF}\`."
+  local verb_done="Adds"; [[ "$1" == "update" ]] && verb_done="Updates"
+  echo "${verb_done} the shared \`${CALLER}\` workflow as a caller of \`${ORG}/.github/${WORKFLOW_PATH}@${REF}\`."
   if [[ -f "$NOTE_FILE" ]]; then echo; render "$NOTE_FILE"; fi
 }
 
@@ -174,22 +183,39 @@ for raw in "${REPOS[@]}"; do
     echo "  ✗ cannot access repo (not found / no permission)"; failed=$((failed+1)); continue
   fi
 
-  if gh api "repos/${repo}/contents/${WORKFLOW_PATH}?ref=${default_branch}" >/dev/null 2>&1; then
-    echo "  • already has ${WORKFLOW_PATH} — skipping"; skipped=$((skipped+1)); continue
-  fi
-
   content_b64=$(render "$TEMPLATE" | base64 | tr -d '\n')
 
+  # Detect an existing caller. Its blob sha is required by the contents API to
+  # overwrite; comparing content first keeps --update runs convergent (a repo
+  # already matching the template is a skip, not an empty commit/PR).
+  verb="add"
+  file_sha=""
+  if meta=$(gh api "repos/${repo}/contents/${WORKFLOW_PATH}?ref=${default_branch}" \
+      --jq '.sha + " " + (.content | gsub("\\n"; ""))' 2>/dev/null); then
+    if [[ $UPDATE != true ]]; then
+      echo "  • already has ${WORKFLOW_PATH} — skipping (--update to overwrite)"; skipped=$((skipped+1)); continue
+    fi
+    file_sha="${meta%% *}"
+    if [[ "${meta#* }" == "$content_b64" ]]; then
+      echo "  • already up to date — skipping"; skipped=$((skipped+1)); continue
+    fi
+    verb="update"
+  fi
+
   if [[ $APPLY != true ]]; then
-    info "would add ${WORKFLOW_PATH} (@${REF}; vars: ${vars_disp})"
+    info "would ${verb} ${WORKFLOW_PATH} (@${REF}; vars: ${vars_disp})"
     info "would deliver via $([[ $DIRECT == true ]] && echo 'direct commit' || echo "PR ${PR_BRANCH} -> ${default_branch}")"
     changed=$((changed+1)); continue
   fi
 
+  # sha must accompany an overwrite; the API rejects it for a new file.
+  sha_args=()
+  [[ -n "$file_sha" ]] && sha_args=(-f sha="${file_sha}")
+
   if [[ $DIRECT == true ]]; then
     if gh api -X PUT "repos/${repo}/contents/${WORKFLOW_PATH}" \
-        -f message="${PR_TITLE}" -f branch="${default_branch}" \
-        -f content="${content_b64}" >/dev/null 2>&1; then
+        -f message="$(pr_title "$verb")" -f branch="${default_branch}" \
+        -f content="${content_b64}" ${sha_args[@]+"${sha_args[@]}"} >/dev/null 2>&1; then
       echo "  ✓ committed to ${default_branch}"; changed=$((changed+1))
     else
       echo "  ✗ commit failed"; failed=$((failed+1))
@@ -209,13 +235,13 @@ for raw in "${REPOS[@]}"; do
   fi
 
   if ! gh api -X PUT "repos/${repo}/contents/${WORKFLOW_PATH}" \
-      -f message="${PR_TITLE}" -f branch="${PR_BRANCH}" \
-      -f content="${content_b64}" >/dev/null 2>&1; then
-    echo "  ✗ failed to add file on ${PR_BRANCH}"; failed=$((failed+1)); continue
+      -f message="$(pr_title "$verb")" -f branch="${PR_BRANCH}" \
+      -f content="${content_b64}" ${sha_args[@]+"${sha_args[@]}"} >/dev/null 2>&1; then
+    echo "  ✗ failed to ${verb} file on ${PR_BRANCH}"; failed=$((failed+1)); continue
   fi
 
   if pr_url=$(gh pr create --repo "${repo}" --base "${default_branch}" --head "${PR_BRANCH}" \
-      --title "${PR_TITLE}" --body "$(pr_body)" 2>/dev/null); then
+      --title "$(pr_title "$verb")" --body "$(pr_body "$verb")" 2>/dev/null); then
     echo "  ✓ PR: ${pr_url}"; changed=$((changed+1))
   else
     echo "  ✗ file added to ${PR_BRANCH} but PR creation failed — create it manually"; failed=$((failed+1))

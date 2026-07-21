@@ -24,7 +24,7 @@ jobs:
       files: ${{ steps.set-files.outputs.files }}
       has_files: ${{ steps.set-files.outputs.has_files }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
 
@@ -57,7 +57,7 @@ jobs:
     container: ghcr.io/smkwlab/texlive-ja-textlint:2026a
     if: needs.find-modified-tex.outputs.has_files == 'true'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Prepare release name
         id: release-name

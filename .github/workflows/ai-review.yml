@@ -64,7 +64,12 @@ jobs:
     # In a workflow_call, github.event is INHERITED from the caller's triggering
     # event, so for a pull_request caller this draft guard works as expected
     # (and is null -> skip for non-PR events).
-    if: github.event.pull_request.draft == false
+    # Dependency bumps carry no prose or design to review, and every run bills
+    # the model API, so dependency bots are skipped outright.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.actor != 'dependabot[bot]' &&
+      github.actor != 'renovate[bot]'
     permissions:
       contents: read
       pull-requests: write

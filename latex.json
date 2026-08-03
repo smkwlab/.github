@@ -6,7 +6,7 @@
     "github>smkwlab/.github:npm#v1",
     "workarounds:all"
   ],
-  "schedule": ["after 10:30am on monday"],
+  "schedule": ["after 11am on monday"],
   "description": "The schedule is a single narrow window, so the inherited two-PR-per-hour cap decides how much of the queue escapes it: one Renovate run per window means two updates per week, and everything else waits on the dependency dashboard indefinitely. Renovate sorts majors last, so they never reach the front. Let the schedule alone bound the noise.",
   "prHourlyLimit": 0,
   "packageRules": [
@@ -30,6 +30,11 @@
       "rangeStrategy": "bump",
       "labels": ["dependencies", "npm"],
       "semanticCommitType": "chore"
+    },
+    {
+      "description": "Repositories reference this preset by the moving v1 tag so that a preset change reaches all of them at once. The renovate-config manager reads that reference as a dependency and rewrites it to the exact current tag, which opts the repository out of the moving tag without anyone deciding to. Leave preset references alone; the reusable-workflow digests in .github/workflows are a separate manager and keep updating.",
+      "matchManagers": ["renovate-config"],
+      "enabled": false
     }
   ]
 }

@@ -5,12 +5,17 @@
   "dependencyDashboard": true,
   "dependencyDashboardLabels": ["dependencies"],
   "semanticCommits": "enabled",
+  "description": [
+    "Merge auto-merged updates with Renovate rather than with GitHub's auto-merge. GitHub merges as soon as the branch protection requirements are satisfied, so a repository whose required status checks are empty merges before CI has run at all. Renovate waits for every check run on the pull request to be green, which does not depend on repository settings. A repository whose branch protection genuinely expresses its full CI may opt back in by setting platformAutomerge itself.",
+    "Merge with squash, matching the org convention in CONTRIBUTING.md. Every repository also allows merge commits and rebases, so the default 'auto' strategy would pick inconsistently."
+  ],
+  "platformAutomerge": false,
+  "automergeStrategy": "squash",
   "packageRules": [
     {
       "description": "Auto-merge only patch and digest updates that pass CI",
       "matchUpdateTypes": ["patch", "digest", "pinDigest"],
-      "automerge": true,
-      "platformAutomerge": true
+      "automerge": true
     }
   ]
 }

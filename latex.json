@@ -7,8 +7,12 @@
     "workarounds:all"
   ],
   "schedule": ["after 11am on monday"],
-  "description": "The schedule is a single narrow window, so the inherited two-PR-per-hour cap decides how much of the queue escapes it: one Renovate run per window means two updates per week, and everything else waits on the dependency dashboard indefinitely. Renovate sorts majors last, so they never reach the front. Let the schedule alone bound the noise.",
+  "description": [
+    "The schedule is a single narrow window, so the inherited two-PR-per-hour cap decides how much of the queue escapes it: one Renovate run per window means two updates per week, and everything else waits on the dependency dashboard indefinitely. Renovate sorts majors last, so they never reach the front. Let the schedule alone bound the noise.",
+    "The concurrent-PR cap throttles the same queue from the other end. Majors are never auto-merged, so they stay open until they are reviewed; under the inherited cap of ten they hold the quota and the auto-merged minor/patch lane stops being refilled -- the same starvation as above, at a different valve. The window is the only throttle either limit needs to leave in place."
+  ],
   "prHourlyLimit": 0,
+  "prConcurrentLimit": 0,
   "packageRules": [
     {
       "description": "GitHub Actions version updates",

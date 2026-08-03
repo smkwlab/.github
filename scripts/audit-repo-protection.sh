@@ -68,6 +68,11 @@ drift=0
 missing=0
 errors=0
 
+# gh api の stderr の置き場。成功時の stdout(JSON) に混ざると壊れるので
+# 2>&1 でまとめず、別ファイルに分ける
+err_file=$(mktemp)
+trap 'rm -f "$err_file"' EXIT
+
 # jq -c で 1 行 1 リポジトリにして読む。パイプではなく here-doc から読むのは、
 # カウンタをループの外へ持ち出すため（パイプだとサブシェルになって消える）
 repos=$(jq -c '.repositories[]' "$CONFIG_PATH")
@@ -85,9 +90,9 @@ while IFS= read -r spec; do
     repo_drift=0
 
     # リポジトリ設定（allow_auto_merge）
-    if ! repo_json=$(gh api "repos/${ORG}/${name}" 2>/dev/null); then
+    if ! repo_json=$(gh api "repos/${ORG}/${name}" 2>"$err_file"); then
         errors=$((errors + 1))
-        log "  ERROR: ${name} — リポジトリ情報を取得できなかった"
+        log "  ERROR: ${name} — リポジトリ情報を取得できなかった: $(cat "$err_file")"
         continue
     fi
 
@@ -97,10 +102,25 @@ while IFS= read -r spec; do
         report "${name}: allow_auto_merge want=${want_am} got=${got_am}"
     fi
 
-    # ブランチ保護
-    if ! prot=$(gh api "repos/${ORG}/${name}/branches/${branch}/protection" 2>/dev/null); then
-        missing=$((missing + 1))
-        log "  missing: ${name} — ${branch} が保護されていない"
+    # ブランチ保護。
+    # 「保護が無い」と「確認できなかった」は別物なので分ける。権限エラーを
+    # missing として報告すると、保護を付け直す方向へ誘導してしまう。
+    #
+    # ステータスコードでは判別できない。GitHub は設定の存在を漏らさないため、
+    # admin 権限が無い場合も 403 ではなく 404 を返す。3 通りとも 404 で、
+    # 区別できるのはメッセージ本文だけ:
+    #   Branch not protected  … 保護が無い          → missing
+    #   Branch not found      … ブランチ自体が無い  → ERROR（宣言側の誤り）
+    #   Not Found             … 権限不足 / repo 無し → ERROR
+    if ! prot=$(gh api "repos/${ORG}/${name}/branches/${branch}/protection" 2>"$err_file"); then
+        api_err=$(cat "$err_file")
+        if printf '%s' "$api_err" | grep -q 'Branch not protected'; then
+            missing=$((missing + 1))
+            log "  missing: ${name} — ${branch} が保護されていない"
+        else
+            errors=$((errors + 1))
+            log "  ERROR: ${name} — 保護設定を確認できなかった: ${api_err}"
+        fi
         continue
     fi
 

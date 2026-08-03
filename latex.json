@@ -1,7 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>smkwlab/.github#v1", "workarounds:all"],
+  "extends": [
+    "github>smkwlab/.github#v1",
+    "github>smkwlab/.github:github-actions#v1",
+    "github>smkwlab/.github:npm#v1",
+    "workarounds:all"
+  ],
   "schedule": ["after 9pm on sunday"],
+  "description": "The schedule is a single narrow window, so the inherited two-PR-per-hour cap decides how much of the queue escapes it: one Renovate run per window means two updates per week, and everything else waits on the dependency dashboard indefinitely. Renovate sorts majors last, so they never reach the front. Let the schedule alone bound the noise.",
+  "prHourlyLimit": 0,
   "packageRules": [
     {
       "description": "GitHub Actions version updates",

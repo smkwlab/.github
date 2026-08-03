@@ -25,7 +25,7 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | `create-next-draft.yml` | PR 作成時に次の draft ブランチを自動作成 | 卒論・ISE レポート |
 | `sync-next-draft.yml` | draft ブランチへの push（suggestion 受け入れ等）を後続の draft ブランチへ自動 merge | 卒論・ISE レポート |
 | `prevent-draft-merge.yml` | draft ブランチの誤マージを防止 | 卒論・ISE レポート |
-| `auto-final-merge.yml` | final-* タグ push 時に承認済み PR を自動マージ | 卒論テンプレート |
+| `auto-final-merge.yml` | final-* タグ push 時に main への提出 PR を作成（マージは教員） | 卒論テンプレート |
 | `ai-review.yml` | ワンショット LLM（Claude/Gemini）による PR 自動レビュー（CODE / ACADEMIC） | 全テンプレート |
 | `claude-qa.yml` | `@claude` メンションへのワンショット QA 回答（質問＋diff＋変更 `.tex` 全文＋会話履歴 → Messages API 1回、エージェントなし） | 全テンプレート |
 | `ai-reviewer.yml` | Gemini AI による PR 自動レビュー（旧基盤・`ai-review.yml` に統合予定） | 既存リポジトリ |
@@ -436,7 +436,14 @@ draft ブランチの誤マージを防止します。`final-*` タグが付い�
 
 ### auto-final-merge.yml
 
-`final-*` タグが push された際に、承認済み PR を自動的にマージしリリースを作成します。
+`final-*` タグが push された際に、タグの付いた commit を含むブランチから `main` への提出 PR を作成します（タイトル `Final Submission: <タグ名>`）。同じ head/base の PR が既にあれば作らず、その旨を出力します。
+
+**マージはしません。** 提出 PR を確認してマージするのは教員です。ワークフロー名も `Create Final PR to Main` です。
+
+最終版 PDF 付きの GitHub Release は、同じタグ push に反応する `latex-build.yml` が作成します。
+
+> ファイル名が実際の動作より広く読めますが、全学生リポジトリの caller が
+> `auto-final-merge.yml@v1` を参照しているため、改名は破壊的変更になります。
 
 ### html-validation.yml
 

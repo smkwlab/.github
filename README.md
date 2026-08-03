@@ -442,8 +442,9 @@ draft ブランチの誤マージを防止します。`final-*` タグが付い�
 
 最終版 PDF 付きの GitHub Release は、同じタグ push に反応する `latex-build.yml` が作成します。
 
-> ファイル名が実際の動作より広く読めますが、全学生リポジトリの caller が
-> `auto-final-merge.yml@v1` を参照しているため、改名は破壊的変更になります。
+> `auto-final-merge` という名前は、この workflow 自身がマージまで行うようにも
+> 読めます。ただし全学生リポジトリの caller が `auto-final-merge.yml@v1` を
+> 参照しているため、改名は破壊的変更になります。
 
 ### html-validation.yml
 

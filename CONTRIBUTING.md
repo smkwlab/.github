@@ -60,7 +60,8 @@
 
 - **GitHub Actions / ライブラリの依存更新は Renovate が一元管理**（Dependabot は不使用）。
   - minor/patch/digest は grouped PR で自動マージ、**major は個別 PR で必ずレビュー**。
-  - **マージするのは Renovate bot**。その PR の全チェックが green になったことを Renovate 自身が確認して squash マージする。GitHub の auto-merge は使わない（ブランチ保護の要件を満たした時点でマージするため、required status check の無いリポジトリでは CI 完了前に入ってしまう）。
+  - **マージするのは Renovate bot**。その PR の全チェックが green になったことを Renovate 自身が確認して squash マージする。
+  - **GitHub の auto-merge は使わない**。auto-merge はブランチ保護の要件を満たした時点でマージするため、required status check が設定されていないリポジトリでは CI 完了前にマージされてしまう。
   - required status check は**人手マージの床**であって自動マージの条件ではない。リポジトリごとの設定は下記ガイド参照。
   - 手で `mix deps.update` や action バージョンを上げる PR は原則不要（Renovate に任せる）。緊急のセキュリティ修正等はこの限りではない。
 - git 依存（`tenbin_dns` 等）は **不変リリースタグに pin**（`branch:` や移動しうる ref は使わない）。

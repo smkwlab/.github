@@ -46,7 +46,7 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 
 ## 依存管理 preset
 
-依存関係の自動更新は Renovate に一元化しています（Dependabot は不使用）。各リポジトリは `.github/renovate.json` から、このリポジトリ直下の共有 preset を移動タグ `v1` で参照します。
+依存関係の自動更新は Renovate に一元化しています（Dependabot は不使用）。各リポジトリは `.github/renovate.json` から、このリポジトリ直下の共有 preset を移動タグ `v1` で参照します。preset の変更が全リポジトリへ一斉に届く経路なので、`v1` を動かす条件は [バージョニング規約](#バージョニング規約) に従ってください。
 
 | preset | 参照名 | 用途 |
 |--------|--------|------|

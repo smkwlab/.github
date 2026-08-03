@@ -102,3 +102,42 @@ caller を追加したら対象リポジトリで動作を確認してくださ�
   以降の新規リポジトリへ伝播します。既存の学生リポジトリへ反映するには
   `thesis-student-registry` の `propagate-workflow`（registry-manager）を併用します
 - 安定運用のため `--ref` はタグ（`v1`）または SHA を推奨（`main` 直参照は避ける）
+
+## audit-repo-protection.sh / apply-repo-protection.sh
+
+開発インフラリポジトリのブランチ保護とマージ設定を、
+[`config/dev-infra-protection.json`](../config/dev-infra-protection.json) の desired state
+として持ち、実設定と突き合わせる・適用する 2 本組です。方針の背景は
+[依存管理基盤（Renovate 一本化）](https://github.com/smkwlab/latex-ecosystem/blob/main/docs/DEPENDENCY-MANAGEMENT.md)
+にあります。
+
+対象は `texlive-ja-textlint` / `latex-environment` / `latex-release-action` /
+`ai-academic-paper-reviewer` / `student-repo-management` / `.github` の 6 つ。学生
+リポジトリは対象外で、`student-repo-management` の `setup-branch-protection.sh` が
+別に管理します。
+
+```bash
+# 乖離があれば非ゼロ終了（読み取りのみ）
+scripts/audit-repo-protection.sh
+scripts/audit-repo-protection.sh --quiet   # 一致した項目を出さない
+
+# 何を変えるか出すだけ（既定）
+scripts/apply-repo-protection.sh
+# 実際に適用する
+scripts/apply-repo-protection.sh --apply
+```
+
+各値をなぜその値にしているかは desired state の `invariants` に書いてあります。設定を
+変えるときは JSON を直してから apply し、audit で一致を確認してください。
+
+### 注意
+
+- **apply は GitHub App のトークンで実行しない**こと。App token だとブランチ保護の
+  一部フィールドが黙って落ちる事例が出ています（smkwlab/student-repo-management#577）。
+  管理者の PAT で手動実行してください。audit は読み取りのみなので App token でも動きます
+- ブランチ保護の PUT は**全項目置換**です。desired state が宣言していない項目は消えます。
+  宣言を増やすときは apply スクリプトの送信ペイロードも合わせて広げること
+- `contexts` には**その PR で必ず check run が生成されるジョブだけ**を並べます。
+  workflow レベルの `paths:` / `branches:` フィルタで発火しない workflow を required に
+  すると、非該当 PR が永久 pending になります（job レベルの `if:` による skip は
+  `conclusion=skipped` の check run が出るので指定して構いません）

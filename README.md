@@ -60,6 +60,8 @@ minor/patch/digest はグループ PR で自動マージ、major は個別 PR �
 
 方針・required status check の設定・変更時の不変条件は [依存管理基盤（Renovate 一本化）](https://github.com/smkwlab/latex-ecosystem/blob/main/docs/DEPENDENCY-MANAGEMENT.md) にまとめています。
 
+各リポジトリの実際のブランチ保護とマージ設定は [`config/dev-infra-protection.json`](config/dev-infra-protection.json) を desired state として持ち、`scripts/audit-repo-protection.sh` で突き合わせ、`scripts/apply-repo-protection.sh` で適用します（[`scripts/README.md`](scripts/README.md)）。
+
 ## 使い方
 
 各リポジトリのワークフローから以下のように参照します：

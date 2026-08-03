@@ -6,8 +6,7 @@
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "groupName": "github actions",
-      "automerge": true,
-      "platformAutomerge": true
+      "automerge": true
     }
   ]
 }

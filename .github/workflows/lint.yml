@@ -1,16 +1,18 @@
 # Lint Workflows
 #
-# Validates GitHub Actions workflow files using actionlint
+# Validates GitHub Actions workflow files using actionlint.
+#
+# Runs on every pull request rather than only on workflow changes: this is the
+# repository's required status check, and a path filter would leave pull
+# requests that touch only presets or docs with no check run to satisfy it.
 
 name: Lint Workflows
 
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/**']
   pull_request:
     branches: [main]
-    paths: ['.github/workflows/**']
 
 permissions:
   contents: read

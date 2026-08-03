@@ -12,13 +12,12 @@
   },
   "packageRules": [
     {
-      "description": "Intentional exception to the org-wide patch/digest-only auto-merge policy: Elixir (hex) packages are reliably semver-compliant, so minor and lockFileMaintenance updates are grouped and auto-merged as well. This preserves the pre-existing behavior of the Elixir repositories.",
+      "description": "Intentional exception to the org-wide patch/digest-only auto-merge policy: Elixir (hex) packages are reliably semver-compliant, so minor and lockFileMaintenance updates are grouped and auto-merged as well. Which updates auto-merge is the exception; who merges them is not -- Renovate merges these, like every other auto-merged update, once it has seen all check runs go green. The required status check here is `ci / Code Quality` alone, so GitHub's auto-merge would release the merge while the OTP/Elixir test matrix is still running.",
       "matchManagers": ["mix"],
       "matchDatasources": ["hex"],
       "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
       "groupName": "elixir dependencies",
-      "automerge": true,
-      "platformAutomerge": true
+      "automerge": true
     }
   ]
 }

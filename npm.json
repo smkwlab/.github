@@ -6,8 +6,7 @@
       "matchManagers": ["npm"],
       "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
       "groupName": "npm dependencies",
-      "automerge": true,
-      "platformAutomerge": true
+      "automerge": true
     }
   ]
 }

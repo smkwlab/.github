@@ -1,3 +1,4 @@
+---
 # Caller template: AI Code Review (one-shot, inline) — calls the ai-review reusable.
 # Distributed by scripts/distribute-workflow.sh as
 # .github/workflows/ai-code-review.yml in each target repository.
@@ -6,7 +7,9 @@ name: AI Code Review
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]   # synchronize: re-review on each push. concurrency below cancels superseded runs. Drop synchronize if cost is a concern.
+    # synchronize: re-review on each push. The concurrency group below cancels
+    # superseded runs. Drop synchronize if cost is a concern.
+    types: [opened, reopened, ready_for_review, synchronize]
 
 concurrency:
   group: ai-code-review-${{ github.event.pull_request.number }}

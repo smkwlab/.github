@@ -72,7 +72,7 @@ jobs:
       - name: Build and Release LaTeX Documents
         # Skip only on an explicit "false" (fail open on anything unexpected)
         if: github.event_name != 'pull_request' || steps.relevance.outputs.build != 'false'
-        uses: smkwlab/latex-release-action@v3.3.0
+        uses: smkwlab/latex-release-action@v3.4.0
         env:
           GH_TOKEN: ${{ github.token }}
         with:

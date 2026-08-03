@@ -101,7 +101,7 @@ jobs:
 
       - name: AI Review
         if: steps.check.outputs.skip != 'true'
-        uses: smkwlab/ai-academic-paper-reviewer@v1.9
+        uses: smkwlab/ai-academic-paper-reviewer@v1.10
         with:
           GEMINI_API_KEY: ${{ secrets.gemini_api_key }}
           ANTHROPIC_API_KEY: ${{ secrets.anthropic_api_key }}

@@ -120,9 +120,15 @@ while IFS= read -r spec; do
         report "${name}: required_status_checks.strict want=${want_strict} got=${got_strict}"
     fi
 
-    # contexts は順序を無視して比較する
+    # contexts は順序を無視して比較する。
+    # API は同じ内容を checks[].context（現行）と contexts（legacy）の両方で返す。
+    # legacy 側はいずれ落ちうるので checks を優先し、無ければ contexts に戻る。
+    # checks の app_id（どの App が報告した check かの固定）は宣言しないので見ない
     want_ctx=$(printf '%s' "$spec" | jq -c '.required_status_checks.contexts | sort')
-    got_ctx=$(printf '%s' "$prot" | jq -c '(.required_status_checks.contexts // []) | sort')
+    got_ctx=$(printf '%s' "$prot" | jq -c '
+        (.required_status_checks.checks // [] | map(.context)) as $new
+        | (if ($new | length) > 0 then $new
+           else (.required_status_checks.contexts // []) end) | sort')
     if [ "$want_ctx" != "$got_ctx" ]; then
         report "${name}: contexts want=${want_ctx} got=${got_ctx}"
     fi

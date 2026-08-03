@@ -63,6 +63,9 @@ if [ "$APPLY" = "true" ]; then
     log "モード: --apply（実際に適用する）"
 else
     log "モード: dry-run（適用するには --apply を付ける）"
+    # このスクリプトは desired state を一方的に送るだけで、現状との差は見ない。
+    # 「今どこがずれているか」は audit の担当
+    log "現状との差は audit-repo-protection.sh で確認すること"
 fi
 
 if [ "$count" -eq 0 ]; then
@@ -92,9 +95,11 @@ while IFS= read -r spec; do
 
     ok=true
 
-    if ! gh api -X PATCH "repos/${ORG}/${name}" -F "allow_auto_merge=${am}" >/dev/null 2>&1; then
+    # 2>&1 >/dev/null で stderr だけ拾う。書き込みが落ちた時に HTTP ステータスや
+    # API のエラーメッセージが残らないと、管理者が原因に辿り着けない
+    if ! err=$(gh api -X PATCH "repos/${ORG}/${name}" -F "allow_auto_merge=${am}" 2>&1 >/dev/null); then
         ok=false
-        log "  ERROR: ${name} — allow_auto_merge を設定できなかった"
+        log "  ERROR: ${name} — allow_auto_merge を設定できなかった: ${err}"
     fi
 
     body=$(printf '%s' "$spec" | jq '{
@@ -103,10 +108,10 @@ while IFS= read -r spec; do
         required_pull_request_reviews: null,
         restrictions: null
     }')
-    if ! printf '%s' "$body" | gh api -X PUT \
-        "repos/${ORG}/${name}/branches/${branch}/protection" --input - >/dev/null 2>&1; then
+    if ! err=$(printf '%s' "$body" | gh api -X PUT \
+        "repos/${ORG}/${name}/branches/${branch}/protection" --input - 2>&1 >/dev/null); then
         ok=false
-        log "  ERROR: ${name} — ブランチ保護を設定できなかった"
+        log "  ERROR: ${name} — ブランチ保護を設定できなかった: ${err}"
     fi
 
     if [ "$ok" = "true" ]; then

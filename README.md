@@ -44,7 +44,21 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | `elixir-ci.yml` | Elixir プロジェクト向け CI | Elixir プロジェクト |
 | `security.yml` | 依存関係監査・シークレットスキャン | Elixir プロジェクト |
 
-依存関係の自動更新は Renovate Bot に一元化しました（各リポジトリの `renovate.json` を参照）。
+## 依存管理 preset
+
+依存関係の自動更新は Renovate に一元化しています（Dependabot は不使用）。各リポジトリは `.github/renovate.json` から、このリポジトリ直下の共有 preset を移動タグ `v1` で参照します。preset の変更が全リポジトリへ一斉に届く経路なので、`v1` を動かす条件は [バージョニング規約](#バージョニング規約) に従ってください。
+
+| preset | 参照名 | 用途 |
+|--------|--------|------|
+| `default.json` | `github>smkwlab/.github` | org 共通の既定 |
+| `github-actions.json` | `github>smkwlab/.github:github-actions` | GitHub Actions のグループ更新 |
+| `npm.json` | `github>smkwlab/.github:npm` | npm のグループ更新 |
+| `elixir.json` | `github>smkwlab/.github:elixir` | Elixir プロジェクト |
+| `latex.json` | `github>smkwlab/.github:latex` | LaTeX エコシステムのリポジトリ |
+
+minor/patch/digest はグループ PR で自動マージ、major は個別 PR でレビューします。マージするのは Renovate bot で、その PR の全チェックが green になったことを確認して squash マージします（GitHub の auto-merge は使いません）。
+
+方針・required status check の設定・変更時の不変条件は [依存管理基盤（Renovate 一本化）](https://github.com/smkwlab/latex-ecosystem/blob/main/docs/DEPENDENCY-MANAGEMENT.md) にまとめています。
 
 ## 使い方
 

@@ -55,6 +55,14 @@ log() {
 
 branch=$(jq -r '.branch' "$CONFIG_PATH")
 count=$(jq '.repositories | length' "$CONFIG_PATH")
+# require_pull_request が true のリポジトリに期待する中身。
+# 欠けていたら止める。null のまま進むと全リポジトリが drift として報告され、
+# 実際にはずれていないのに「ずれている」と読める報告が毎週出ることになる
+review_settings=$(jq -cS '.review_settings' "$CONFIG_PATH")
+if [ -z "$review_settings" ] || [ "$review_settings" = "null" ]; then
+    log "review_settings が宣言に無い。期待値が決まらないので中止する"
+    exit 1
+fi
 
 log "desired state: $CONFIG_PATH"
 log "対象: ${count} リポジトリ (org: ${ORG}, branch: ${branch})"
@@ -128,6 +136,23 @@ while IFS= read -r spec; do
     got_admins=$(printf '%s' "$prot" | jq -r '.enforce_admins.enabled')
     if [ "$want_admins" != "$got_admins" ]; then
         report "${name}: enforce_admins want=${want_admins} got=${got_admins}"
+    fi
+
+    # 「Require a pull request before merging」の有無。これが外れると main へ
+    # 直接 push できるようになるが、PR も check run も出ないので気付く手段が無い
+    want_pr=$(printf '%s' "$spec" | jq -r '.require_pull_request')
+    got_pr=$(printf '%s' "$prot" | jq -r '.required_pull_request_reviews != null')
+    if [ "$want_pr" != "$got_pr" ]; then
+        report "${name}: require_pull_request want=${want_pr} got=${got_pr}"
+    elif [ "$want_pr" = "true" ]; then
+        got_reviews=$(printf '%s' "$prot" | jq -cS '.required_pull_request_reviews | {
+            required_approving_review_count,
+            dismiss_stale_reviews,
+            require_code_owner_reviews
+        }')
+        if [ "$review_settings" != "$got_reviews" ]; then
+            report "${name}: review settings want=${review_settings} got=${got_reviews}"
+        fi
     fi
 
     want_strict=$(printf '%s' "$spec" | jq -r '.required_status_checks.strict')

@@ -56,6 +56,16 @@ log() {
 
 branch=$(jq -r '.branch' "$CONFIG_PATH")
 count=$(jq '.repositories | length' "$CONFIG_PATH")
+# require_pull_request が true のリポジトリに送る中身。有効な側は設定が全て同じ
+# なので宣言では 1 箇所にまとめてある。
+#
+# 欠けていたら止める。null のまま進むと required_pull_request_reviews に null を
+# 送ることになり、「Require a pull request before merging」を外す動作に戻る
+review_settings=$(jq -c '.review_settings' "$CONFIG_PATH")
+if [ -z "$review_settings" ] || [ "$review_settings" = "null" ]; then
+    log "review_settings が宣言に無い。require_pull_request の適用先が決まらないので中止する"
+    exit 1
+fi
 
 log "desired state: $CONFIG_PATH"
 log "対象: ${count} リポジトリ (org: ${ORG}, branch: ${branch})"
@@ -86,9 +96,10 @@ while IFS= read -r spec; do
     am=$(printf '%s' "$spec" | jq -r '.allow_auto_merge')
     admins=$(printf '%s' "$spec" | jq -r '.enforce_admins')
     checks=$(printf '%s' "$spec" | jq -c '.required_status_checks')
+    pr_required=$(printf '%s' "$spec" | jq -r '.require_pull_request')
 
     if [ "$APPLY" != "true" ]; then
-        log "  would apply: ${name} — allow_auto_merge=${am} enforce_admins=${admins} checks=${checks}"
+        log "  would apply: ${name} — allow_auto_merge=${am} enforce_admins=${admins} require_pull_request=${pr_required} checks=${checks}"
         applied=$((applied + 1))
         continue
     fi
@@ -102,10 +113,14 @@ while IFS= read -r spec; do
         log "  ERROR: ${name} — allow_auto_merge を設定できなかった: ${err}"
     fi
 
-    body=$(printf '%s' "$spec" | jq '{
+    # required_pull_request_reviews は宣言から組み立てる。PUT は全項目置換なので、
+    # ここを無条件に null にすると「Require a pull request before merging」が外れ、
+    # main へ直接 push できる状態になる。宣言している 11 リポジトリのうち 9 つが
+    # この設定を持っており、null 固定は保護を落とす操作だった
+    body=$(printf '%s' "$spec" | jq --argjson reviews "$review_settings" '{
         required_status_checks: .required_status_checks,
         enforce_admins: .enforce_admins,
-        required_pull_request_reviews: null,
+        required_pull_request_reviews: (if .require_pull_request then $reviews else null end),
         restrictions: null
     }')
     if ! err=$(printf '%s' "$body" | gh api -X PUT \

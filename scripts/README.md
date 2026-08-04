@@ -111,10 +111,14 @@ caller を追加したら対象リポジトリで動作を確認してくださ�
 [依存管理基盤（Renovate 一本化）](https://github.com/smkwlab/latex-ecosystem/blob/main/docs/DEPENDENCY-MANAGEMENT.md)
 にあります。
 
-対象は `texlive-ja-textlint` / `latex-environment` / `latex-release-action` /
-`ai-academic-paper-reviewer` / `student-repo-management` / `.github` の 6 つ。学生
-リポジトリは対象外で、`student-repo-management` の `setup-branch-protection.sh` が
-別に管理します。
+対象は 11 リポジトリです。latex 系が `texlive-ja-textlint` / `latex-environment` /
+`latex-release-action` / `ai-academic-paper-reviewer` / `student-repo-management` /
+`.github` の 6 つ、elixir 系が `tenbin_dns` / `tdig` / `tenbin_ex` / `tenbin_cache` /
+`elixir_dnstap` の 5 つ。学生リポジトリは対象外で、`student-repo-management` の
+`setup-branch-protection.sh` が別に管理します。
+
+値は系統ごとに違うところがあります（elixir 系は `strict: true`）。理由は desired
+state の `invariants` に書いてあります。
 
 ```bash
 # 乖離があれば非ゼロ終了（読み取りのみ）
@@ -150,7 +154,11 @@ secret が未設定のときは skip せず失敗します。何も見ていな�
   一部フィールドが黙って落ちる事例が出ています（smkwlab/student-repo-management#577）。
   管理者の PAT で手動実行してください。audit は読み取りのみなので App token でも動きます
 - ブランチ保護の PUT は**全項目置換**です。desired state が宣言していない項目は消えます。
-  宣言を増やすときは apply スクリプトの送信ペイロードも合わせて広げること
+  宣言を増やすときは apply スクリプトの送信ペイロードも合わせて広げること。
+  実際に踏んだ例として、`required_pull_request_reviews` を宣言せず `null` で送っていた
+  時期があり、`--apply` すると「Require a pull request before merging」が外れて
+  main へ直接 push できる状態になっていました（現在は `require_pull_request` として
+  宣言しています）
 - `contexts` には**その PR で必ず check run が生成されるジョブだけ**を並べます。
   workflow レベルの `paths:` / `branches:` フィルタで発火しない workflow を required に
   すると、非該当 PR が永久 pending になります（job レベルの `if:` による skip は

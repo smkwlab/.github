@@ -155,3 +155,60 @@ secret が未設定のときは skip せず失敗します。何も見ていな�
   workflow レベルの `paths:` / `branches:` フィルタで発火しない workflow を required に
   すると、非該当 PR が永久 pending になります（job レベルの `if:` による skip は
   `conclusion=skipped` の check run が出るので指定して構いません）
+
+## audit-texlive-tags.sh
+
+`ghcr.io/smkwlab/texlive-ja-textlint` のタグが各リポジトリで揃っているかを
+[`config/texlive-tag-refs.json`](../config/texlive-tag-refs.json) の宣言と突き合わせます。
+
+タグは複数のリポジトリの複数のファイルに散らばっているうえ、**ずれても何も壊れません**。
+古いイメージは残り続けるので参照は解決し、ビルドも通ります。そのため上げ忘れに誰も
+気付きません。実例として `latex-release-action` の `test.yml` は、配布物と 3 世代違う
+環境で CI を回していました。
+
+```bash
+# 乖離があれば非ゼロ終了（読み取りのみ）
+scripts/audit-texlive-tags.sh
+scripts/audit-texlive-tags.sh --quiet   # 一致したリポジトリを出さない
+```
+
+期待値は `latex-environment` の `.devcontainer/devcontainer.json` から取ります。各所の
+記述が既に「devcontainer と揃えている」と名乗っているため、そこを正とすると宣言が
+既存の意図と一致します。
+
+比較するのはカレンダーバージョン形式（`2026d` など）のタグだけです。`latest` のように
+版を固定していないタグは比較対象外として数だけ報告します。`2026d-alpine` のような
+派生タグは版の部分で比較します。
+
+### 宣言の直しかた
+
+| 状況 | 直す場所 |
+|---|---|
+| 参照を持つリポジトリが増えた | `repositories` に名前を足す |
+| 意図的に古い版を書いている（手順の説明など） | そのリポジトリの `ignore` にパスを足す |
+| イメージ名とタグが離れて書かれていて拾えない | そのリポジトリの `extra_patterns` に PCRE を足す |
+
+`extra_patterns` は `\K` でタグの直前まで読み飛ばし、**タグだけにマッチする**形で書きます
+（`ECOSYSTEM.md` のバージョン互換性の表がこの形です）。既定の検出はイメージの完全な参照
+（`ghcr.io/smkwlab/texlive-ja-textlint:<tag>`）だけを見るため、表組みのようにイメージ名と
+タグが別の列に分かれている箇所は拾えません。
+
+`texlive-ja-textlint` 自身は対象に入れていません。新しいイメージを発行してから
+`latex-environment` が追随するまでの間、producer の文書は正しく「先行」した状態になり、
+毎回 drift として報告されてしまうためです。producer 側の README 追随は同リポジトリの
+`update-readme-issue.yml` が別に見ています。
+
+### 週次監査
+
+`.github/workflows/audit-texlive-tags.yml` が毎週月曜 09:30 JST に audit を回し、
+乖離があれば本リポジトリに Issue を起票します（既存の報告があればコメントを追記）。
+ブランチ保護の監査と同じ月曜に走るので、報告 Issue が同時に立たないよう 30 分ずらして
+います。
+
+必要な権限は対象リポジトリへの `contents: read` です。secret の扱いと、未設定時に
+skip せず失敗する理由は
+[ブランチ保護の週次監査](#週次監査)と同じです。
+
+**是正は自動化しません。** イメージ更新は textlint のルールが変わって学生の lint 結果に
+直接効くため（`latex-template` の見本が新ルールで 11 件の指摘を受ける問題を配布前に
+潰した例があります）、上げてよいかは人が判断して PR を出します。

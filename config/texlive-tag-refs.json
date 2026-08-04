@@ -1,0 +1,61 @@
+{
+  "$schema-note": "ghcr.io/smkwlab/texlive-ja-textlint のタグを名乗る箇所の宣言（issue #128）。イメージ更新は textlint のルールが変わり学生の lint 結果に直接効くため、上げるのは人の判断に残す。この宣言は上げ忘れを検出するためのもので、是正は自動化しない。突き合わせは scripts/audit-texlive-tags.sh が行う。",
+  "image": "ghcr.io/smkwlab/texlive-ja-textlint",
+  "source_of_truth": {
+    "repo": "latex-environment",
+    "path": ".devcontainer/devcontainer.json",
+    "note": "各所の記述は既に devcontainer と揃っていることを名乗っている（latex-release-action の Dockerfile には「Keep this base image tag in sync with latex-environment's devcontainer」と書いてある）。ここを正とすると、宣言が既存の意図と一致する。"
+  },
+  "invariants": {
+    "producer": "texlive-ja-textlint は対象に入れない。新しいイメージを発行してから latex-environment が追随するまでの間、producer の文書は正しく「先行」した状態になり、毎回 drift として報告されてしまう。producer 側の README 追随は同リポジトリの update-readme-issue.yml が別に見ている。",
+    "version_tags_only": "比較するのはカレンダーバージョン形式（2026d など）のタグだけ。latest / alpine / debian のような可変タグや、文書中の省略記号は意図的に版を固定していないので比較しない。2026d-alpine のような派生タグは版の部分で比較する。",
+    "read_only": "監査は読み取りのみ。イメージを上げる PR は人が出す。",
+    "coverage": "既定の検出はイメージの完全な参照（ghcr.io/smkwlab/texlive-ja-textlint:<tag>）に限る。イメージ名とタグが離れて書かれている箇所は拾えないので、拾いたい箇所は extra_patterns に PCRE で宣言する。"
+  },
+  "repositories": [
+    {
+      "name": "latex-environment"
+    },
+    {
+      "name": "latex-release-action"
+    },
+    {
+      "name": ".github"
+    },
+    {
+      "name": "aldc"
+    },
+    {
+      "name": "latex-ecosystem",
+      "ignore": [
+        "docs/RELEASE-OPERATIONS.md"
+      ],
+      "ignore_note": "更新手順の説明で、架空の版（2025d）をリリースする筋書きとして書いている。現行版に揃えると手順の語りが壊れる。",
+      "extra_patterns": [
+        "texlive-ja-textlint \\| \\K[0-9]{4}[a-z]?"
+      ],
+      "extra_patterns_note": "ECOSYSTEM.md のバージョン互換性の表は、イメージ名とタグを別の列に書くため既定の検出では拾えない。この表は 2026-08-04 まで 2026a のまま放置されていた。"
+    },
+    {
+      "name": "sotsuron-template"
+    },
+    {
+      "name": "sotsuron-report-template"
+    },
+    {
+      "name": "ise-report-template"
+    },
+    {
+      "name": "wr-template"
+    },
+    {
+      "name": "latex-template"
+    },
+    {
+      "name": "poster-template"
+    },
+    {
+      "name": "student-repo-management"
+    }
+  ]
+}

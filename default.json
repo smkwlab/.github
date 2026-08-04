@@ -7,10 +7,12 @@
   "semanticCommits": "enabled",
   "description": [
     "Merge auto-merged updates with Renovate rather than with GitHub's auto-merge. GitHub merges as soon as the branch protection requirements are satisfied, so a repository whose required status checks are empty merges before CI has run at all. Renovate waits for every check run on the pull request to be green, which does not depend on repository settings. A repository whose branch protection genuinely expresses its full CI may opt back in by setting platformAutomerge itself.",
-    "Merge with squash, matching the org convention in CONTRIBUTING.md. Every repository also allows merge commits and rebases, so the default 'auto' strategy would pick inconsistently."
+    "Merge with squash, matching the org convention in CONTRIBUTING.md. Every repository also allows merge commits and rebases, so the default 'auto' strategy would pick inconsistently.",
+    "Read vulnerabilities from osv.dev instead of relying on the repository's Dependabot alerts. The vulnerability path is what lets a security fix skip the weekly window, and its source of truth would otherwise be a repository setting that is not under version control: a repository created with alerts off is silently left with no vulnerability detection at all, and its fixes queue behind routine updates. ai-academic-paper-reviewer sat in exactly that state, and enabling alerts surfaced eleven open advisories at once. osvVulnerabilityAlerts is marked experimental upstream (renovatebot/renovate#20542), so watch how [SECURITY] pull requests arrive, including whether a repository with alerts still on reports the same advisory twice."
   ],
   "platformAutomerge": false,
   "automergeStrategy": "squash",
+  "osvVulnerabilityAlerts": true,
   "packageRules": [
     {
       "description": "Auto-merge only patch and digest updates that pass CI",

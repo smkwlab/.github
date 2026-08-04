@@ -9,10 +9,15 @@
   "schedule": ["after 9pm on sunday"],
   "description": [
     "The schedule is a single narrow window, so the inherited two-PR-per-hour cap decides how much of the queue escapes it: one Renovate run per window means two updates per week, and everything else waits on the dependency dashboard indefinitely. Renovate sorts majors last, so they never reach the front. Let the schedule alone bound the noise.",
-    "The concurrent-PR cap throttles the same queue from the other end. Majors are never auto-merged, so they stay open until they are reviewed; under the inherited cap of ten they hold the quota and the auto-merged minor/patch lane stops being refilled -- the same starvation as above, at a different valve. The window is the only throttle either limit needs to leave in place."
+    "The concurrent-PR cap throttles the same queue from the other end. Majors are never auto-merged, so they stay open until they are reviewed; under the inherited cap of ten they hold the quota and the auto-merged minor/patch lane stops being refilled -- the same starvation as above, at a different valve. The window is the only throttle either limit needs to leave in place.",
+    "Refresh lock files on the same weekly cadence. Bumping direct dependencies never rewrites the rest of the tree, so advisories in transitive packages accumulate unseen -- the eleven advisories found in ai-academic-paper-reviewer were almost all transitive. Lock file maintenance carries its own schedule that the top-level one does not override, so the window is repeated here; leaving it out would fall back to Renovate's Monday-early default and split the week into two update waves. This lives in the latex preset rather than the npm one because the window is defined here, and it is a no-op for repositories that have no lock file."
   ],
   "prHourlyLimit": 0,
   "prConcurrentLimit": 0,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["after 9pm on sunday"]
+  },
   "packageRules": [
     {
       "description": "GitHub Actions version updates",

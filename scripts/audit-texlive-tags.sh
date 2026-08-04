@@ -85,10 +85,13 @@ if ! sot_json=$(gh api "repos/${ORG}/${sot_repo}/contents/${sot_path}" 2>"$err_f
     cat "$err_file" >&2
     exit 1
 fi
-expected=$(printf '%s' "$sot_json" | jq -r '.content' | base64 -d \
+sot_tag=$(printf '%s' "$sot_json" | jq -r '.content' | base64 -d \
     | grep -Eo "${image}:[A-Za-z0-9._-]+" | head -1 | sed "s|^${image}:||")
-if [ -z "$(version_of "$expected")" ]; then
-    log "ERROR: source of truth からバージョン形式のタグを取り出せなかった (取得値: '${expected:-空}')"
+# 期待値も version_of に通す。source of truth が派生タグ（2026d-alpine）を
+# 指しているとき、生のまま比べると全リポジトリが drift になる
+expected=$(version_of "$sot_tag")
+if [ -z "$expected" ]; then
+    log "ERROR: source of truth からバージョン形式のタグを取り出せなかった (取得値: '${sot_tag:-空}')"
     log "  ${sot_repo}/${sot_path} が ${image}:<tag> を含んでいるか確認すること"
     exit 1
 fi

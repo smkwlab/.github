@@ -149,6 +149,45 @@ jobs:
         path: cover/
         retention-days: 7
 
+  # One check run that stands for the whole matrix, so branch protection has a
+  # single context to require. Requiring the matrix jobs directly would mean
+  # editing every repository's protection each time an OTP or Elixir version
+  # moves, because their names carry the versions.
+  #
+  # `if: always()` is what makes this work. Without it a failing dependency
+  # skips this job instead of failing it, and GitHub counts a skipped required
+  # check as satisfied -- the gate would go quietly green exactly when it is
+  # supposed to stop the merge. The results are therefore read explicitly.
+  #
+  # dialyzer is left out: it only runs on push, so on a pull request it would
+  # always be skipped and could never be part of a verdict.
+  gate:
+    if: always()
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    name: All checks
+
+    steps:
+    # Only `success` passes. `skipped` fails on purpose: a job that did not run
+    # has certified nothing, and accepting it would reopen the hole this gate
+    # exists to close -- adding an `if:` to a job above would then let it out of
+    # the verdict silently. If a job ever becomes legitimately optional, decide
+    # that here rather than letting the gate infer it.
+    #
+    # The results are echoed so the log records what the verdict was based on,
+    # including on the runs that pass.
+    - name: Verify that every required job succeeded
+      env:
+        RESULTS: ${{ needs.quality.result }} ${{ needs.test.result }}
+      run: |
+        echo "quality=${{ needs.quality.result }} test=${{ needs.test.result }}"
+        for result in $RESULTS; do
+          if [ "$result" != "success" ]; then
+            echo "::error::A required job did not succeed (${RESULTS})"
+            exit 1
+          fi
+        done
+
   dialyzer:
     if: ${{ inputs.dialyzer-enabled && github.event_name == 'push' }}
     runs-on: ubuntu-latest

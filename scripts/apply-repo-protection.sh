@@ -57,8 +57,15 @@ log() {
 branch=$(jq -r '.branch' "$CONFIG_PATH")
 count=$(jq '.repositories | length' "$CONFIG_PATH")
 # require_pull_request が true のリポジトリに送る中身。有効な側は設定が全て同じ
-# なので宣言では 1 箇所にまとめてある
+# なので宣言では 1 箇所にまとめてある。
+#
+# 欠けていたら止める。null のまま進むと required_pull_request_reviews に null を
+# 送ることになり、「Require a pull request before merging」を外す動作に戻る
 review_settings=$(jq -c '.review_settings' "$CONFIG_PATH")
+if [ -z "$review_settings" ] || [ "$review_settings" = "null" ]; then
+    log "review_settings が宣言に無い。require_pull_request の適用先が決まらないので中止する"
+    exit 1
+fi
 
 log "desired state: $CONFIG_PATH"
 log "対象: ${count} リポジトリ (org: ${ORG}, branch: ${branch})"

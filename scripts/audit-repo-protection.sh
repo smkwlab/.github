@@ -55,8 +55,14 @@ log() {
 
 branch=$(jq -r '.branch' "$CONFIG_PATH")
 count=$(jq '.repositories | length' "$CONFIG_PATH")
-# require_pull_request が true のリポジトリに期待する中身
+# require_pull_request が true のリポジトリに期待する中身。
+# 欠けていたら止める。null のまま進むと全リポジトリが drift として報告され、
+# 実際にはずれていないのに「ずれている」と読める報告が毎週出ることになる
 review_settings=$(jq -cS '.review_settings' "$CONFIG_PATH")
+if [ -z "$review_settings" ] || [ "$review_settings" = "null" ]; then
+    log "review_settings が宣言に無い。期待値が決まらないので中止する"
+    exit 1
+fi
 
 log "desired state: $CONFIG_PATH"
 log "対象: ${count} リポジトリ (org: ${ORG}, branch: ${branch})"

@@ -2,13 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>smkwlab/.github:latex#v1"],
   "description": [
-    "Document templates: the latex preset plus one guard. A template's contents are copied verbatim into every student repository generated from it, and those repositories have no Renovate. Anything pinned here is therefore frozen there for good.",
-    "Keep the shared-workflow reference on the moving v1 tag. The latex preset pins github-actions references to a digest, which is right for a repository that has an updater; here it would freeze the one channel that reaches student repositories after they are created. Third-party actions stay SHA-pinned: those are real versions, and a student repository holding a fixed actions/checkout is harmless."
-  ],
-  "packageRules": [
-    {
-      "matchPackageNames": ["smkwlab/.github"],
-      "pinDigests": false
-    }
+    "Document templates. The configuration currently matches the latex preset exactly, but the constraint behind it is different and the seam is worth keeping: a template's contents are copied verbatim into every student repository generated from it, and those repositories have no Renovate. Anything pinned in a template is frozen there for good, whatever the infrastructure repositories decide to do.",
+    "The shared-workflow reference is kept on the moving v1 tag by the latex preset, which is why no rule is repeated here. Should that preset ever pin it again, this preset is where the templates opt back out."
   ]
 }

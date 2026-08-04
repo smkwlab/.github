@@ -168,6 +168,14 @@ jobs:
     name: All checks
 
     steps:
+    # Only `success` passes. `skipped` fails on purpose: a job that did not run
+    # has certified nothing, and accepting it would reopen the hole this gate
+    # exists to close -- adding an `if:` to a job above would then let it out of
+    # the verdict silently. If a job ever becomes legitimately optional, decide
+    # that here rather than letting the gate infer it.
+    #
+    # The results are echoed so the log records what the verdict was based on,
+    # including on the runs that pass.
     - name: Verify that every required job succeeded
       env:
         RESULTS: ${{ needs.quality.result }} ${{ needs.test.result }}

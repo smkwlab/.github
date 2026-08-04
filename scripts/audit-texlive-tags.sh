@@ -127,7 +127,7 @@ while IFS= read -r spec; do
     hits=$(
         cd "$repo_dir" || exit 1
         git ls-files -z \
-            | xargs -0 grep -EoHn "${image}:[A-Za-z0-9._-]+" 2>/dev/null \
+            | xargs -0 -r grep -EoHn "${image}:[A-Za-z0-9._-]+" 2>/dev/null \
             | sed "s|:${image}:|:|" || true
     )
 
@@ -136,7 +136,7 @@ while IFS= read -r spec; do
         [ -z "$pattern" ] && continue
         found=$(
             cd "$repo_dir" || exit 1
-            git ls-files -z | xargs -0 grep -oHnP "$pattern" 2>/dev/null || true
+            git ls-files -z | xargs -0 -r grep -oHnP "$pattern" 2>/dev/null || true
         )
         [ -n "$found" ] && hits=$(printf '%s\n%s' "$hits" "$found")
     done <<EOF

@@ -8,7 +8,7 @@
   },
   "invariants": {
     "producer": "texlive-ja-textlint は対象に入れない。新しいイメージを発行してから latex-environment が追随するまでの間、producer の文書は正しく「先行」した状態になり、毎回 drift として報告されてしまう。producer 側の README 追随は同リポジトリの update-readme-issue.yml が別に見ている。",
-    "version_tags_only": "比較するのはカレンダーバージョン形式（2026d など）のタグだけ。latest / alpine / debian のような可変タグや、文書中の省略記号は意図的に版を固定していないので比較しない。2026d-alpine のような派生タグは版の部分で比較する。",
+    "version_tags_only": "比較するのはカレンダーバージョン形式のタグだけ。西暦 4 桁に小文字を続けた形（2026d、2026 のように無印も可）を版とみなし、ハイフン以降は派生（2026d-alpine）として落としてから比較する。latest / alpine / debian のような可変タグや、文書中の省略記号はこの形に当たらないので比較しない。この形から外れるタグ（2026d.1 のような形）も比較対象外になるため、タグの付け方を変えるならこの判定も直すこと。",
     "read_only": "監査は読み取りのみ。イメージを上げる PR は人が出す。",
     "coverage": "既定の検出はイメージの完全な参照（ghcr.io/smkwlab/texlive-ja-textlint:<tag>）に限る。イメージ名とタグが離れて書かれている箇所は拾えないので、拾いたい箇所は extra_patterns に PCRE で宣言する。"
   },

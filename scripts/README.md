@@ -130,6 +130,20 @@ scripts/apply-repo-protection.sh --apply
 各値をなぜその値にしているかは desired state の `invariants` に書いてあります。設定を
 変えるときは JSON を直してから apply し、audit で一致を確認してください。
 
+### 週次監査
+
+`.github/workflows/audit-repo-protection.yml` が毎週月曜 09:00 JST に audit を回し、
+乖離があれば本リポジトリに Issue を起票します（既存の報告があればコメントを追記）。
+是正は書き込みなので自動化せず、Issue の指示に従って管理者が apply を実行します。
+
+有効化には `APP_ID` / `APP_PRIVATE_KEY` をこのリポジトリの secret に置くか、org
+secret にしてこのリポジトリから参照できるようにする必要があります。ワークフロー側の
+記述はどちらでも `${{ secrets.APP_ID }}` で変わりません。GitHub App には対象 6
+リポジトリへの `administration: read` が要ります（ブランチ保護の参照に必要な権限）。
+
+secret が未設定のときは skip せず失敗します。何も見ていない監査が success を返すと
+「確認済み」と誤読されるためです。
+
 ### 注意
 
 - **apply は GitHub App のトークンで実行しない**こと。App token だとブランチ保護の

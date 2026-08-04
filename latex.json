@@ -39,11 +39,6 @@
       "rangeStrategy": "bump",
       "labels": ["dependencies", "npm"],
       "semanticCommitType": "chore"
-    },
-    {
-      "description": "Repositories reference this preset by the moving v1 tag so that a preset change reaches all of them at once. The renovate-config manager reads that reference as a dependency and rewrites it to the exact current tag, which opts the repository out of the moving tag without anyone deciding to. Leave preset references alone; the reusable-workflow digests in .github/workflows are a separate manager and keep updating.",
-      "matchManagers": ["renovate-config"],
-      "enabled": false
     }
   ]
 }

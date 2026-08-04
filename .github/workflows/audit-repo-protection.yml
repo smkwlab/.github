@@ -1,0 +1,116 @@
+---
+# 開発インフラリポジトリのブランチ保護とマージ設定を週次で監査する。
+#
+# これらの設定は GitHub 上にしか存在しないため、消されても、リポジトリが増えて
+# 設定漏れても、誰も気付かない。desired state は
+# config/dev-infra-protection.json にあり、突き合わせは
+# scripts/audit-repo-protection.sh が行う。
+#
+# 是正は apply-repo-protection.sh を管理者が手で実行する。ここから書き込みは
+# しない（App token だとブランチ保護の一部フィールドが黙って落ちる事例がある。
+# smkwlab/student-repo-management#577）。
+name: Audit Repo Protection
+
+"on":
+  schedule:
+    # 毎週月曜 09:00 JST（00:00 UTC）
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      # secret が無いときに skip すると、何も見ていない監査が success を出し、
+      # 「確認済み」と誤読される。設定漏れは黙らせずに落とす。
+      - name: Check that the App credentials are configured
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APP_ID" ] || [ -z "$APP_PRIVATE_KEY" ]; then
+            echo "::error::APP_ID / APP_PRIVATE_KEY が未設定。scripts/README.md の有効化手順を参照"
+            exit 1
+          fi
+
+      # ブランチ保護の参照には対象リポジトリへの administration: read が要り、
+      # github.token はこのリポジトリにしか効かない。
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 乖離があればスクリプトは非ゼロで終わる。ここで落とさず、報告まで進む。
+      - name: Audit
+        id: audit
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # tee にパイプしないこと。パイプラインの終了ステータスは tee のものに
+          # なるため、乖離があっても常に clean=true になる。
+          if bash scripts/audit-repo-protection.sh --quiet > audit.log 2>&1; then
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat audit.log
+
+      # Issue はこのリポジトリに立てるので github.token で足りる。App に
+      # issues: write を持たせない。
+      - name: Report drift
+        if: steps.audit.outputs.clean != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "ブランチ保護が desired state と一致しない"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "\`config/dev-infra-protection.json\` と GitHub の実設定が一致しません。"
+            echo
+            echo '```'
+            cat audit.log
+            echo '```'
+            echo
+            echo "是正するには、管理者の PAT で以下を実行してください（App token では"
+            echo "一部フィールドが黙って落ちます）。"
+            echo
+            echo '```bash'
+            echo "scripts/apply-repo-protection.sh           # 何を変えるか確認"
+            echo "scripts/apply-repo-protection.sh --apply   # 適用"
+            echo '```'
+            echo
+            echo "実行: ${RUN_URL}"
+          } > report.md
+
+          # 週次で回るので、既存の報告があれば追記する。毎週新しい Issue が
+          # 積み上がると、どれが現状か分からなくなる。
+          #
+          # --search は全文検索なので、この文言を含む別の Issue を拾いうるし、
+          # インデックスの遅れで直前に立てた Issue を見落として二重に立てうる。
+          # 一覧を取って題名の完全一致で選ぶ。
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,title \
+            --jq '[.[] | select(.title == env.TITLE) | .number] | first // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file report.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" --body-file report.md
+          fi
+
+      # 報告を投げてから落とす。Actions の一覧でも赤く見えるようにする。
+      - name: Fail if drift was found
+        if: steps.audit.outputs.clean != 'true'
+        run: |
+          echo "::error::desired state と一致しない。詳細は起票された Issue を参照"
+          exit 1

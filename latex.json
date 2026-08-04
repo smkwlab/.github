@@ -39,6 +39,11 @@
       "rangeStrategy": "bump",
       "labels": ["dependencies", "npm"],
       "semanticCommitType": "chore"
+    },
+    {
+      "description": "Keep the shared-workflow reference on the moving v1 tag. Pinning it to a digest here does not create a review opportunity: moving v1 delivers the change to student repositories first, and Renovate only bumps the digest afterwards, so the pin makes this repository the last to see a change rather than the first. On the moving tag every consumer receives it at the same moment and the CI of the repositories that have one goes red immediately if it is broken. Third-party actions keep their digest pins -- those have an updater here and no consumer downstream.",
+      "matchPackageNames": ["smkwlab/.github"],
+      "pinDigests": false
     }
   ]
 }

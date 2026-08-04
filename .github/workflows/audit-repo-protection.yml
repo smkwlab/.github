@@ -94,8 +94,13 @@ jobs:
 
           # 週次で回るので、既存の報告があれば追記する。毎週新しい Issue が
           # 積み上がると、どれが現状か分からなくなる。
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          #
+          # --search は全文検索なので、この文言を含む別の Issue を拾いうるし、
+          # インデックスの遅れで直前に立てた Issue を見落として二重に立てうる。
+          # 一覧を取って題名の完全一致で選ぶ。
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,title \
+            --jq '[.[] | select(.title == env.TITLE) | .number] | first // empty')
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file report.md
           else

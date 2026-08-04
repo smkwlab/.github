@@ -18,6 +18,11 @@
       "description": "Auto-merge only patch and digest updates that pass CI",
       "matchUpdateTypes": ["patch", "digest", "pinDigest"],
       "automerge": true
+    },
+    {
+      "description": "Repositories reference these presets by the moving v1 tag so that a preset change reaches all of them at once. The renovate-config manager reads that reference as a dependency and rewrites it to the exact current tag, which opts the repository out of the moving tag without anyone deciding to -- it happened to student-repo-management three times before anyone noticed. Leave preset references alone; the reusable-workflow digests in .github/workflows are a separate manager and keep updating. This sits in the shared base rather than in one family's preset so that the protection is a stated intent everywhere. The elixir preset was covered only as a side effect of its enabledManagers allow-list, which would stop protecting the moment a manager was added to that list.",
+      "matchManagers": ["renovate-config"],
+      "enabled": false
     }
   ]
 }

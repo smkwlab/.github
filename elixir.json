@@ -5,6 +5,14 @@
     "github>smkwlab/.github:github-actions#v1"
   ],
   "enabledManagers": ["mix", "github-actions"],
+  "description": [
+    "Raise the Erlang/OTP floor used to regenerate mix.lock. Renovate's mix manager treats its two tools asymmetrically: erlang falls back to a hardcoded `^26` (lib/modules/manager/mix/artifacts.ts), while elixir has no default and floats to the newest release satisfying the `elixir:` requirement in mix.exs. Every repository here allows `~> 1.17` or wider, so Renovate picks Elixir 1.20.x -- which requires OTP 27+ and refuses to install against OTP 26. The install step then aborts with `ERROR! Unsupported Erlang/OTP version, expected Erlang/OTP 27+`, Renovate reports `Command failed: install-tool elixir vX.Y.Z`, mix.lock is left untouched, and the resulting empty commit is dropped (`Detected empty commit - aborting git push`). Every mix lock file update has failed this way since Elixir 1.20.0 was released on 2026-06-03.",
+    "Constrain erlang rather than elixir. Pinning elixir low would only avoid the mismatch by accident, and would freeze lock file generation on an Elixir line the projects no longer target. This affects only the toolchain Renovate installs to regenerate lock files; the OTP/Elixir matrix in each repository's CI is configured separately and is unchanged.",
+    "Do not narrow this to an exact version. Renovate resolves the constraint against containerbase's erlang prebuilds, which are published as four-component versions (27.3.4.15, not 27.3.4); a range keeps picking up their patch releases."
+  ],
+  "constraints": {
+    "erlang": "^27"
+  },
   "schedule": ["before 6am on monday"],
   "lockFileMaintenance": {
     "enabled": true,

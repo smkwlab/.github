@@ -38,7 +38,7 @@
       "allowedVersions": "/^27\\.\\d+(\\.\\d+)*$/"
     },
     {
-      "description": "The Elixir half of the same older pair. See the erlang/otp-lts rule above.",
+      "description": "The Elixir half of the same older pair, held to its line for the same reason as the erlang/otp-lts rule above. Move it by editing this range, and move both rows together: setup-beam resolves an Elixir build against an OTP major (v1.17.3-otp-27), so the pair is what is being tested, not either half.",
       "matchDepNames": ["elixir-lang/elixir-lts"],
       "allowedVersions": "/^1\\.17\\.\\d+$/"
     }

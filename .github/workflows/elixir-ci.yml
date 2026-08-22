@@ -14,22 +14,26 @@ on:
     inputs:
       otp-version-lts:
         description: 'LTS OTP version'
-        default: '27.3.4.4'
+        # renovate: datasource=github-releases depName=erlang/otp-lts packageName=erlang/otp versioning=loose extractVersion=^OTP-(?<version>.*)$
+        default: '27.3.4.16'
         required: false
         type: string
       elixir-version-lts:
         description: 'LTS Elixir version'
+        # renovate: datasource=github-releases depName=elixir-lang/elixir-lts packageName=elixir-lang/elixir versioning=semver extractVersion=^v(?<version>.*)$
         default: '1.17.3'
         required: false
         type: string
       otp-version-latest:
         description: 'Latest OTP version'
-        default: '29.0.2'
+        # renovate: datasource=github-releases depName=erlang/otp packageName=erlang/otp versioning=loose extractVersion=^OTP-(?<version>.*)$
+        default: '29.0.5'
         required: false
         type: string
       elixir-version-latest:
         description: 'Latest Elixir version'
-        default: '1.20.1'
+        # renovate: datasource=github-releases depName=elixir-lang/elixir packageName=elixir-lang/elixir versioning=semver extractVersion=^v(?<version>.*)$
+        default: '1.20.3'
         required: false
         type: string
       dialyzer-enabled:
@@ -102,6 +106,7 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up Elixir
+      id: beam
       uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
       with:
         otp-version: ${{ matrix.otp }}
@@ -114,14 +119,17 @@ jobs:
         key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
         restore-keys: ${{ runner.os }}-mix-
 
+    # Keyed on what setup-beam actually installed rather than on what was
+    # asked for, so that a moving or range version cannot hand this run an
+    # artifact another toolchain compiled. The elixir-version output carries
+    # the OTP pairing too (v1.20.3-otp-29). The bare ${{ runner.os }}-build-
+    # fallback is deliberately absent: it restored across toolchains.
     - name: Restore build cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: _build
-        key: ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}-
-          ${{ runner.os }}-build-
+        key: ${{ runner.os }}-build-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-build-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
 
     - name: Install dependencies
       run: mix deps.get
@@ -203,6 +211,7 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up Elixir
+      id: beam
       uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
       with:
         otp-version: ${{ inputs.otp-version-latest }}
@@ -215,15 +224,17 @@ jobs:
         key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
         restore-keys: ${{ runner.os }}-mix-
 
+    # A PLT contains OTP's own modules, so one built against a different OTP
+    # makes Dialyzer report failures and successes that are both meaningless --
+    # and a failure here opens an issue. Key on the installed toolchain and
+    # drop the bare ${{ runner.os }}-plt- fallback, which crossed toolchains.
     - name: Restore PLT cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       id: plt_cache
       with:
         path: priv/plts
-        key: ${{ runner.os }}-plt-${{ inputs.otp-version-latest }}-${{ inputs.elixir-version-latest }}-${{ hashFiles('**/mix.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-plt-${{ inputs.otp-version-latest }}-${{ inputs.elixir-version-latest }}-
-          ${{ runner.os }}-plt-
+        key: ${{ runner.os }}-plt-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-plt-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
 
     - name: Install dependencies
       run: mix deps.get

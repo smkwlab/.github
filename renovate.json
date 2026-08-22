@@ -4,7 +4,17 @@
     "github>smkwlab/.github#v1",
     "github>smkwlab/.github:github-actions#v1"
   ],
-  "enabledManagers": ["github-actions"],
+  "enabledManagers": ["github-actions", "custom.regex"],
+  "customManagers": [
+    {
+      "description": "The OTP and Elixir versions the Elixir CI matrix runs on are workflow_call input defaults, which the github-actions manager does not see -- it reads `uses:` references only. Left unmanaged they simply rot: the LTS OTP pin sat twelve patch releases behind before anyone noticed (#146). Each default carries a `# renovate:` annotation naming its upstream, and this manager turns the pair into a dependency. Every key is written out on every annotation rather than made optional, so that the pattern has no optional groups to leave empty.",
+      "customType": "regex",
+      "managerFilePatterns": [".github/workflows/elixir-ci.yml"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) packageName=(?<packageName>\\S+) versioning=(?<versioning>\\S+) extractVersion=(?<extractVersion>\\S+)\\s+default: '(?<currentValue>[^']+)'"
+      ]
+    }
+  ],
   "packageRules": [
     {
       "description": "Keep the html-validation Python runtime pinned (3.11 was chosen deliberately). A new Python minor may lack html5validator / tool support and CI does not exercise it here, so bump it manually rather than via the grouped auto-merge.",
@@ -16,6 +26,21 @@
       "matchPackageNames": ["ghcr.io/smkwlab/texlive-ja-textlint"],
       "versioning": "loose",
       "allowedVersions": "/^20\\d{2}[a-z]?$/"
+    },
+    {
+      "description": "OTP tags a maintenance release with a fourth component (27.3.4.16), which is not semver, hence loose versioning. Loose does not recognise a pre-release either, so restrict candidates to all-numeric versions and leave the rc tags out.",
+      "matchDepNames": ["erlang/otp"],
+      "allowedVersions": "/^\\d+(\\.\\d+)+$/"
+    },
+    {
+      "description": "The two rows of the CI matrix are a supported older pair and the newest pair, so the older row has to stay on its line: without this it would be offered OTP 29 and stop being the thing it is there to test. Moving the row to the next line is a decision to make deliberately, by editing this range.",
+      "matchDepNames": ["erlang/otp-lts"],
+      "allowedVersions": "/^27\\.\\d+(\\.\\d+)*$/"
+    },
+    {
+      "description": "The Elixir half of the same older pair. See the erlang/otp-lts rule above.",
+      "matchDepNames": ["elixir-lang/elixir-lts"],
+      "allowedVersions": "/^1\\.17\\.\\d+$/"
     }
   ]
 }

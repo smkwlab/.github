@@ -6,9 +6,11 @@
     "github>smkwlab/.github:npm#v1",
     "workarounds:all"
   ],
-  "schedule": ["after 9pm on sunday"],
+  "schedule": ["on friday and saturday"],
   "description": [
-    "The schedule is a single narrow window, so the inherited two-PR-per-hour cap decides how much of the queue escapes it: one Renovate run per window means two updates per week, and everything else waits on the dependency dashboard indefinitely. Renovate sorts majors last, so they never reach the front. Let the schedule alone bound the noise.",
+    "Open the window across Friday and Saturday. Renovate's own guidance is to `Avoid schedules like \"Run Renovate for an hour each Sunday\" as you will run into problems`, and the mechanism behind that is easy to miss: a schedule never starts a run, it only tells a run already under way whether it may act. Mend's cloud schedules jobs every four hours, so a window narrower than that interval can fall entirely between two of them. Sunday 21:00 to midnight in Tokyo is 12:00 to 15:00 UTC, and latex-release-action's jobs land at :41 past the hour, which puts 11:41 and 15:41 on either side of it. Four consecutive job logs from it and from latex-environment end in `Package not scheduled`, neither having failed at anything else, and both repositories spent three weeks with updates listed as awaiting schedule and not one pull request created.",
+    "Two days costs nothing to widen to, because the caps below are unlimited: the first job that lands inside the window drains the queue, and the eleven that follow it find nothing left to create. Width buys only the certainty that one job lands inside at all. Friday and Saturday here, Sunday and Monday in the elixir preset, so that the two families' pull requests -- and the CI runs they start -- do not arrive in the same burst against an organisation whose Mend plan grants one or two concurrent jobs.",
+    "The hourly cap decides how much of the queue escapes the window. Mend runs a repository's job every four hours, so the inherited limit of two pull requests per hour is really two per run, and a window holds about a dozen runs: a backlog larger than that never drains inside one, and what is left waits on the dependency dashboard until the next. Renovate sorts majors last, so they are what stays behind, week after week. Let the schedule alone bound the noise.",
     "The concurrent-PR cap throttles the same queue from the other end. Majors are never auto-merged, so they stay open until they are reviewed; under the inherited cap of ten they hold the quota and the auto-merged minor/patch lane stops being refilled -- the same starvation as above, at a different valve. The window is the only throttle either limit needs to leave in place.",
     "Refresh lock files on the same weekly cadence. Bumping direct dependencies never rewrites the rest of the tree, so advisories in transitive packages accumulate unseen -- the eleven advisories found in ai-academic-paper-reviewer were almost all transitive. Lock file maintenance carries its own schedule that the top-level one does not override, so the window is repeated here; leaving it out would fall back to Renovate's Monday-early default and split the week into two update waves. This lives in the latex preset rather than the npm one because the window is defined here, and it is a no-op for repositories that have no lock file."
   ],
@@ -16,7 +18,7 @@
   "prConcurrentLimit": 0,
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["after 9pm on sunday"]
+    "schedule": ["on friday and saturday"]
   },
   "packageRules": [
     {

@@ -33,7 +33,7 @@ on:
       elixir-version-latest:
         description: 'Latest Elixir version'
         # renovate: datasource=github-releases depName=elixir-lang/elixir packageName=elixir-lang/elixir versioning=semver extractVersion=^v(?<version>.*)$
-        default: '1.20.3'
+        default: '1.20.4'
         required: false
         type: string
       dialyzer-enabled:

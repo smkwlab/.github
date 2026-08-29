@@ -54,7 +54,7 @@ jobs:
   build-and-release:
     needs: find-modified-tex
     runs-on: ubuntu-latest
-    container: ghcr.io/smkwlab/texlive-ja-textlint:2026d
+    container: ghcr.io/smkwlab/texlive-ja-textlint:2026e
     if: needs.find-modified-tex.outputs.has_files == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

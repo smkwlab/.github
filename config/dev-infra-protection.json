@@ -7,7 +7,7 @@
     "strict": "latex 系は false。up-to-date 要求を付けると、1 本マージするたび全 PR が rebase と再ビルドになる。elixir 系は true のまま置いている。マージが月 0〜4 件で再ビルドの費用が出ておらず、個別には緑でも組み合わせると壊れる PR の検出を優先している",
     "contexts": "その PR で必ず check run が生成されるジョブだけを列挙する。job レベルの if: で skip されたジョブは conclusion=skipped の check run が出るので指定してよい。workflow レベルの paths: / branches: フィルタで発火しない workflow は check run 自体が出ず永久 pending になるので指定してはいけない",
     "require_pull_request": "true 固定。これが無いと main へ直接 push できる。設定内容は全リポジトリで同じなので、形は review_settings に一度だけ書き、リポジトリごとには有無だけを宣言する。latex-environment と tenbin_cache だけ無効だったが、どちらも main の変更は実際に全て PR 経由で、main へ push する自動化も無かったため、運用に合わせて有効にした",
-    "review_settings": "ここに書いたフィールドだけを管理する。require_last_push_approval や bypass_pull_request_allowances のような書いていないフィールドは、audit では突き合わせず、apply では PUT の全項目置換によって API の既定値に戻る。現在 11 リポジトリすべてが既定値なので両者は一致している。既定から外した値を残したいなら、ここに書き足すこと"
+    "review_settings": "ここに書いたフィールドだけを管理する。require_last_push_approval や bypass_pull_request_allowances のような書いていないフィールドは、audit では突き合わせず、apply では PUT の全項目置換によって API の既定値に戻る。現在 15 リポジトリすべてが既定値なので両者は一致している。既定から外した値を残したいなら、ここに書き足すこと"
   },
   "review_settings": {
     "required_approving_review_count": 0,
@@ -117,6 +117,46 @@
     },
     {
       "name": "elixir_dnstap",
+      "allow_auto_merge": false,
+      "enforce_admins": false,
+      "require_pull_request": true,
+      "required_status_checks": {
+        "strict": true,
+        "contexts": ["ci / Code Quality", "ci / All checks"]
+      }
+    },
+    {
+      "name": "ecosystem-manager",
+      "allow_auto_merge": false,
+      "enforce_admins": false,
+      "require_pull_request": true,
+      "required_status_checks": {
+        "strict": true,
+        "contexts": ["ci / Code Quality", "ci / All checks"]
+      }
+    },
+    {
+      "name": "registry-manager",
+      "allow_auto_merge": false,
+      "enforce_admins": false,
+      "require_pull_request": true,
+      "required_status_checks": {
+        "strict": true,
+        "contexts": ["ci / Code Quality", "ci / All checks"]
+      }
+    },
+    {
+      "name": "thesis-monitor",
+      "allow_auto_merge": false,
+      "enforce_admins": false,
+      "require_pull_request": true,
+      "required_status_checks": {
+        "strict": true,
+        "contexts": ["ci / Code Quality", "ci / All checks"]
+      }
+    },
+    {
+      "name": "elixir-tool-kit",
       "allow_auto_merge": false,
       "enforce_admins": false,
       "require_pull_request": true,

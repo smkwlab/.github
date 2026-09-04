@@ -17,7 +17,7 @@
   "schedule": ["on sunday and monday"],
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 5am on sunday"]
+    "schedule": ["after 6am and before 12pm on sunday"]
   },
   "packageRules": [
     {

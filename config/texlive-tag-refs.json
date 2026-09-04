@@ -17,7 +17,15 @@
       "name": "latex-environment"
     },
     {
-      "name": "latex-release-action"
+      "name": "latex-release-action",
+      "ignore": [
+        "CHANGELOG.md"
+      ],
+      "ignore_note": "どのリリースが何を出したかの記録。2026d と 2026a を名乗る行があるが、現行版に揃えると履歴が壊れる。",
+      "extra_patterns": [
+        "(?<!ghcr\\.io/smkwlab/)texlive-ja-textlint:\\K[0-9]{4}[a-z]?"
+      ],
+      "extra_patterns_note": "Dockerfile の 1 行目は既定の検出が拾うが、8 行目の注記はレジストリ接頭辞を伴わないため拾えない。同じイメージを指す 2 箇所のうち片方だけが動くと、どのバリアントが使われるかの説明が実態と食い違う。否定後読みは、既定の検出と同じ箇所を二重に数えないため。"
     },
     {
       "name": ".github"
@@ -32,9 +40,10 @@
       ],
       "ignore_note": "更新手順の説明で、架空の版（2025d）をリリースする筋書きとして書いている。現行版に揃えると手順の語りが壊れる。",
       "extra_patterns": [
-        "texlive-ja-textlint \\| \\K[0-9]{4}[a-z]?"
+        "texlive-ja-textlint \\| \\K[0-9]{4}[a-z]?",
+        "(?<!ghcr\\.io/smkwlab/)texlive-ja-textlint:\\K[0-9]{4}[a-z]?"
       ],
-      "extra_patterns_note": "ECOSYSTEM.md のバージョン互換性の表は、イメージ名とタグを別の列に書くため既定の検出では拾えない。この表は 2026-08-04 まで 2026a のまま放置されていた。"
+      "extra_patterns_note": "ECOSYSTEM.md のバージョン互換性の表は、イメージ名とタグを別の列に書くため既定の検出では拾えない。この表は 2026-08-04 まで 2026a のまま放置されていた。2 つ目は同じ表の次の行で、こちらは名前とタグがコロンで 1 セルに収まっているため 1 つ目では拾えない。隣り合う 2 行の片方だけが監査対象という状態になっていた。"
     },
     {
       "name": "sotsuron-template"

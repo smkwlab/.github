@@ -127,10 +127,16 @@ while IFS= read -r spec; do
     # からの相対パスなので、grep も repo root で走らせる
     # cd の失敗は握り潰さない。空の結果は「一致している」と区別が付かず、
     # 何も見ていない監査が ok を出すことになる
+    # grep の失敗は 0 件と区別する。終了コードでは見分けられない: マッチが
+    # 無いとき grep は 1 を返すが、xargs は子が 1..125 で終わると一律 123 を
+    # 返すため、「一致しなかった」と「起動できなかった」が同じ値になる。
+    # grep はマッチが無いだけなら標準エラーに何も書かないので、その有無で
+    # 判定する。捨ててしまうと、検出器が動いていない監査が ok を出す
+    : > "$err_file"
     hits=$(
         cd "$repo_dir" || exit 1
         git ls-files -z \
-            | xargs -0 -r grep -EoHn "${image}:[A-Za-z0-9._-]+" 2>/dev/null \
+            | xargs -0 -r grep -EoHn "${image}:[A-Za-z0-9._-]+" 2>>"$err_file" \
             | sed "s|:${image}:|:|" || true
     )
 
@@ -139,12 +145,18 @@ while IFS= read -r spec; do
         [ -z "$pattern" ] && continue
         found=$(
             cd "$repo_dir" || exit 1
-            git ls-files -z | xargs -0 -r grep -oHnP "$pattern" 2>/dev/null || true
+            git ls-files -z | xargs -0 -r grep -oHnP "$pattern" 2>>"$err_file" || true
         )
         [ -n "$found" ] && hits=$(printf '%s\n%s' "$hits" "$found")
     done <<EOF
 $extra
 EOF
+
+    if [ -s "$err_file" ]; then
+        errors=$((errors + 1))
+        log "  ERROR: ${name} — grep が失敗した: $(tr '\n' ' ' < "$err_file" | cut -c1-200)"
+        continue
+    fi
 
     repo_drift=0
     repo_skipped=0

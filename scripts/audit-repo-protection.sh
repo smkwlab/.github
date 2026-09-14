@@ -159,10 +159,11 @@ while IFS= read -r spec; do
     # API は同じ内容を checks[].context（現行）と contexts（legacy）の両方で返す。
     # legacy 側はいずれ落ちうるので checks を優先し、無ければ contexts に戻る。
     # checks の app_id（どの App が報告した check かの固定）は宣言しないので見ない
-    got_ctx=$(printf '%s' "$prot" | jq -c '
-        (.required_status_checks.checks // [] | map(.context)) as $new
+    # 単一引用符は意図的。$new は jq の変数で、シェルに展開させては困る
+    # shellcheck disable=SC2016
+    read_ctx='(.required_status_checks.checks // [] | map(.context)) as $new
         | (if ($new | length) > 0 then $new
-           else (.required_status_checks.contexts // []) end) | sort')
+           else (.required_status_checks.contexts // []) end) | sort'
 
     # required_status_checks: null は「required check を持たない」という宣言で、
     # 書き忘れではない。PR 上で必ず check run が出るジョブが無いリポジトリでは、
@@ -172,7 +173,11 @@ while IFS= read -r spec; do
     want_checks=$(printf '%s' "$spec" | jq -c '.required_status_checks')
     if [ "$want_checks" = "null" ]; then
         if [ "$(printf '%s' "$prot" | jq -r '.required_status_checks != null')" = "true" ]; then
-            report "${name}: required_status_checks want=なし got=${got_ctx}"
+            # contexts だけを出すと、contexts が空で strict だけ立っている設定が
+            # got=[] に見えて「何も無いのに drift」と読めてしまう。両方を出す。
+            # API の生オブジェクトは url 類を含んで読みにくいので、この 2 つに絞る。
+            got_checks=$(printf '%s' "$prot" | jq -c "{strict: .required_status_checks.strict, contexts: (${read_ctx})}")
+            report "${name}: required_status_checks want=なし got=${got_checks}"
         fi
     else
         want_strict=$(printf '%s' "$spec" | jq -r '.required_status_checks.strict')
@@ -186,6 +191,7 @@ while IFS= read -r spec; do
         fi
 
         want_ctx=$(printf '%s' "$spec" | jq -c '.required_status_checks.contexts | sort')
+        got_ctx=$(printf '%s' "$prot" | jq -c "$read_ctx")
         if [ "$want_ctx" != "$got_ctx" ]; then
             report "${name}: contexts want=${want_ctx} got=${got_ctx}"
         fi

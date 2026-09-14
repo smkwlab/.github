@@ -10,7 +10,9 @@
 # openssl output -- a certificate carries host names, and GitHub's masking only
 # covers exact matches of the secret string.
 #
-# Run it from Actions -> Probe SMTP TLS capability -> Run workflow.
+# Run it from Actions -> Probe SMTP TLS capability -> Run workflow. The job
+# succeeds only when the credentials are actually protected, so the run's own
+# red or green answers the question before you read the log.
 # See smkwlab/.github#182.
 name: Probe SMTP TLS capability
 
@@ -29,7 +31,7 @@ jobs:
           SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
-          set -u
+          set -euo pipefail
 
           if [ -z "${SMTP_SERVER}" ] || [ -z "${SMTP_PORT}" ]; then
             echo "::error::SMTP_SERVER / SMTP_PORT are not visible from this repository."
@@ -44,7 +46,7 @@ jobs:
             *)   echo "port      : none of 465, 587 or 25 -- the action defaults 'secure' to false" ;;
           esac
 
-          if timeout 15 nc -z -w 15 "${SMTP_SERVER}" "${SMTP_PORT}"; then
+          if timeout 15 nc -z "${SMTP_SERVER}" "${SMTP_PORT}"; then
             echo "reachable : yes"
           else
             echo "reachable : no -- the runner cannot open a TCP connection"
@@ -58,7 +60,8 @@ jobs:
               echo "verdict   : credentials are already protected. require_tls would be inert; nothing to change."
             else
               echo "tls       : no -- the port is open but TLS did not negotiate"
-              echo "::warning::Port 465 with no working TLS. Investigate the server before changing the workflow."
+              echo "::error::Port 465 with no working TLS. Investigate the server before changing the workflow."
+              exit 1
             fi
           else
             if timeout 30 openssl s_client -starttls smtp -connect "${SMTP_SERVER}:${SMTP_PORT}" -brief </dev/null >/dev/null 2>&1; then
@@ -66,7 +69,8 @@ jobs:
               echo "verdict   : credentials are encrypted today, but only opportunistically. Setting require_tls: true makes it mandatory and changes nothing else."
             else
               echo "starttls  : no -- the server does not advertise STARTTLS"
-              echo "::warning::Credentials are being sent in clear text today."
+              echo "::error::Credentials are being sent in clear text today."
               echo "verdict   : require_tls: true would stop the notifications rather than fix this. Fix the transport first -- STARTTLS on the server, or implicit TLS on 465."
+              exit 1
             fi
           fi

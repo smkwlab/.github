@@ -6,9 +6,15 @@
 # never gives a secret back after it is set, so the only way to learn either
 # is to measure from a runner.
 #
-# This workflow measures and reports a verdict. It prints no secret and no raw
-# openssl output -- with -brief openssl echoes the peer certificate's CN, and
-# GitHub's masking only covers exact matches of the secret string.
+# Scope: this asks whether the channel is encrypted, not whether the
+# certificate is trusted. Trust is already enforced where it matters --
+# nodemailer rejects an untrusted peer by default, and notify-ml-on-pr does
+# not set the action's ignore_cert input -- so an untrusted certificate makes
+# the real send fail rather than leak anything.
+#
+# This workflow prints no secret and no raw openssl output: with -brief
+# openssl echoes the peer certificate's CN, and GitHub's masking only covers
+# exact matches of the secret string.
 #
 # Run it from Actions -> Probe SMTP TLS capability -> Run workflow. The job
 # succeeds only when the credentials are actually protected, so the run's own
@@ -39,18 +45,34 @@ jobs:
             exit 1
           fi
 
+          # Validate before comparing or connecting, so a malformed secret
+          # fails here with a clear message instead of somewhere downstream.
+          # The value itself is never echoed.
+          case "${SMTP_PORT}" in
+            ''|*[!0-9]*)
+              echo "::error::SMTP_PORT is not a number."
+              exit 1
+              ;;
+          esac
+          if [ "${SMTP_PORT}" -lt 1 ] || [ "${SMTP_PORT}" -gt 65535 ]; then
+            echo "::error::SMTP_PORT is outside the range of a TCP port."
+            exit 1
+          fi
+
+          # A bare IPv6 literal needs brackets before it can carry a port.
+          connect_host="${SMTP_SERVER}"
+          case "${SMTP_SERVER}" in
+            *:*) connect_host="[${SMTP_SERVER}]" ;;
+          esac
+
           # Assert the handshake positively rather than trusting an exit code
           # alone. The captured output is read but never printed.
           tls_negotiates() {
             local out rc
-            out=$(mktemp)
+            out=$(mktemp) || { echo "::error::mktemp failed."; return 1; }
+            trap 'rm -f "${out}"' RETURN
             timeout 30 openssl s_client "$@" -brief </dev/null >"${out}" 2>&1 && rc=0 || rc=1
-            if [ "${rc}" -eq 0 ] && grep -q "CONNECTION ESTABLISHED" "${out}"; then
-              rm -f "${out}"
-              return 0
-            fi
-            rm -f "${out}"
-            return 1
+            [ "${rc}" -eq 0 ] && grep -q "CONNECTION ESTABLISHED" "${out}"
           }
 
           case "${SMTP_PORT}" in
@@ -74,7 +96,7 @@ jobs:
           fi
 
           if [ "${SMTP_PORT}" = "465" ]; then
-            if tls_negotiates -connect "${SMTP_SERVER}:${SMTP_PORT}"; then
+            if tls_negotiates -connect "${connect_host}:${SMTP_PORT}"; then
               echo "tls       : yes -- encrypted from the first byte"
               echo "verdict   : credentials are already protected. require_tls would be inert; nothing to change."
             else
@@ -83,7 +105,7 @@ jobs:
               exit 1
             fi
           else
-            if tls_negotiates -starttls smtp -connect "${SMTP_SERVER}:${SMTP_PORT}"; then
+            if tls_negotiates -starttls smtp -connect "${connect_host}:${SMTP_PORT}"; then
               echo "starttls  : yes -- advertised, and the handshake completes"
               echo "verdict   : credentials are encrypted today, but only opportunistically. Setting require_tls: true makes it mandatory and changes nothing else."
             else

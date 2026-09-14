@@ -7,8 +7,8 @@
 # is to measure from a runner.
 #
 # This workflow measures and reports a verdict. It prints no secret and no raw
-# openssl output -- a certificate carries host names, and GitHub's masking only
-# covers exact matches of the secret string.
+# openssl output -- with -brief openssl echoes the peer certificate's CN, and
+# GitHub's masking only covers exact matches of the secret string.
 #
 # Run it from Actions -> Probe SMTP TLS capability -> Run workflow. The job
 # succeeds only when the credentials are actually protected, so the run's own
@@ -39,6 +39,20 @@ jobs:
             exit 1
           fi
 
+          # Assert the handshake positively rather than trusting an exit code
+          # alone. The captured output is read but never printed.
+          tls_negotiates() {
+            local out rc
+            out=$(mktemp)
+            timeout 30 openssl s_client "$@" -brief </dev/null >"${out}" 2>&1 && rc=0 || rc=1
+            if [ "${rc}" -eq 0 ] && grep -q "CONNECTION ESTABLISHED" "${out}"; then
+              rm -f "${out}"
+              return 0
+            fi
+            rm -f "${out}"
+            return 1
+          }
+
           case "${SMTP_PORT}" in
             465) echo "port      : 465 (implicit TLS) -- the action defaults 'secure' to true" ;;
             587) echo "port      : 587 (submission) -- the action defaults 'secure' to false" ;;
@@ -46,16 +60,17 @@ jobs:
             *)   echo "port      : none of 465, 587 or 25 -- the action defaults 'secure' to false" ;;
           esac
 
-          if timeout 15 nc -z "${SMTP_SERVER}" "${SMTP_PORT}"; then
+          # bash's own /dev/tcp, so the probe depends on no netcat flavour.
+          if timeout 15 bash -c 'exec 3<>/dev/tcp/"$0"/"$1"' "${SMTP_SERVER}" "${SMTP_PORT}" 2>/dev/null; then
             echo "reachable : yes"
           else
             echo "reachable : no -- the runner cannot open a TCP connection"
-            echo "::warning::Unreachable from a GitHub runner means notify-ml-on-pr is not delivering mail either."
+            echo "::error::Unreachable from a GitHub runner means notify-ml-on-pr is not delivering mail either."
             exit 1
           fi
 
           if [ "${SMTP_PORT}" = "465" ]; then
-            if timeout 30 openssl s_client -connect "${SMTP_SERVER}:${SMTP_PORT}" -brief </dev/null >/dev/null 2>&1; then
+            if tls_negotiates -connect "${SMTP_SERVER}:${SMTP_PORT}"; then
               echo "tls       : yes -- encrypted from the first byte"
               echo "verdict   : credentials are already protected. require_tls would be inert; nothing to change."
             else
@@ -64,11 +79,11 @@ jobs:
               exit 1
             fi
           else
-            if timeout 30 openssl s_client -starttls smtp -connect "${SMTP_SERVER}:${SMTP_PORT}" -brief </dev/null >/dev/null 2>&1; then
-              echo "starttls  : yes -- the server advertises STARTTLS"
+            if tls_negotiates -starttls smtp -connect "${SMTP_SERVER}:${SMTP_PORT}"; then
+              echo "starttls  : yes -- advertised, and the handshake completes"
               echo "verdict   : credentials are encrypted today, but only opportunistically. Setting require_tls: true makes it mandatory and changes nothing else."
             else
-              echo "starttls  : no -- the server does not advertise STARTTLS"
+              echo "starttls  : no -- not advertised, or the handshake failed"
               echo "::error::Credentials are being sent in clear text today."
               echo "verdict   : require_tls: true would stop the notifications rather than fix this. Fix the transport first -- STARTTLS on the server, or implicit TLS on 465."
               exit 1

@@ -275,6 +275,11 @@ PR 作成時にメーリングリストへ通知メールを送信します。
 - `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`
 - `LAB_ML_ADDRESS`, `SMTP_FROM`
 
+**通信が暗号化されているかの確認:**
+`SMTP_PORT` が 465 でなければ接続は平文で始まり、STARTTLS に上がれるかはサーバ次第です。
+上がれない場合は `SMTP_USERNAME` / `SMTP_PASSWORD` が平文で流れます。
+Actions から `Probe SMTP TLS capability` を手動実行すると、シークレットの値を出さずに判定できます（#182）。
+
 ### ai-reviewer.yml
 
 Gemini AI を使用して PR の自動レビューを行います。

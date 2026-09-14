@@ -107,6 +107,51 @@ jobs:
               --title "$TITLE" --body-file report.md
           fi
 
+      # 揃っていれば前回の報告を閉じる。報告するだけで取り下げない監視は、
+      # 是正後も開いたままの Issue を残す。読む側はそれが現状を指しているか
+      # 分からず、実物を確かめ直すことになる（#161 がそうなった）。
+      - name: Close the report once the drift is gone
+        if: steps.audit.outputs.clean == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "texlive-ja-textlint のタグがリポジトリ間でずれている"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # 題名の完全一致で選ぶ。理由は Report drift の同じ検索と同じ。
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,title)
+          existing=$(jq -r '.[] | select(.title == env.TITLE) | .number' <<<"$issues")
+
+          if [ -z "$existing" ]; then
+            # 上限に張り付いた状態で見つからないのは、「無い」ではなく
+            # 「見えていない」かもしれない。黙って成功させると閉じ忘れが
+            # 成功として通るので、そのときだけは落とす。
+            if [ "$(jq 'length' <<<"$issues")" -ge 100 ]; then
+              echo "::error::開いている Issue が一覧の上限に達している。報告を見落とした可能性があるため確認すること"
+              exit 1
+            fi
+            echo "開いている報告は無い。閉じるものが無い"
+            exit 0
+          fi
+
+          {
+            echo "タグが揃ったことを確認したので閉じます。"
+            echo
+            echo '```'
+            cat audit.log
+            echo '```'
+            echo
+            echo "実行: ${RUN_URL}"
+          } > resolved.md
+
+          # 同名の報告が複数あれば全部閉じる。Report drift は先頭にしか追記
+          # しないので、2 本目以降は更新されないまま開き続ける。
+          while read -r number; do
+            [ -n "$number" ] || continue
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file resolved.md
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed
+          done <<<"$existing"
+
       # 報告を投げてから落とす。Actions の一覧でも赤く見えるようにする。
       - name: Fail if drift was found
         if: steps.audit.outputs.clean != 'true'

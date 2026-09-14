@@ -120,7 +120,7 @@ jobs:
           # 題名の完全一致で選ぶ。理由は Report drift の同じ検索と同じ。
           issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
             --json number,title)
-          existing=$(jq -r '[.[] | select(.title == env.TITLE) | .number] | first // empty' <<<"$issues")
+          existing=$(jq -r '.[] | select(.title == env.TITLE) | .number' <<<"$issues")
 
           if [ -z "$existing" ]; then
             # 上限に張り付いた状態で見つからないのは、「無い」ではなく
@@ -144,8 +144,13 @@ jobs:
             echo "実行: ${RUN_URL}"
           } > resolved.md
 
-          gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file resolved.md
-          gh issue close "$existing" --repo "$GITHUB_REPOSITORY" --reason completed
+          # 同名の報告が複数あれば全部閉じる。Report drift は先頭にしか追記
+          # しないので、2 本目以降は更新されないまま開き続ける。
+          while read -r number; do
+            [ -n "$number" ] || continue
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file resolved.md
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed
+          done <<<"$existing"
 
       # 報告を投げてから落とす。Actions の一覧でも赤く見えるようにする。
       - name: Fail if drift was found

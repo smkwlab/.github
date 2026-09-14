@@ -1,0 +1,72 @@
+# Probe SMTP TLS capability
+#
+# notify-ml-on-pr.yml hands SMTP credentials to the lab mail server. Whether
+# they travel encrypted depends on two facts nobody can look up: the value of
+# the SMTP_PORT secret, and whether the server advertises STARTTLS. GitHub
+# never gives a secret back after it is set, so the only way to learn either
+# is to measure from a runner.
+#
+# This workflow measures and reports a verdict. It prints no secret and no raw
+# openssl output -- a certificate carries host names, and GitHub's masking only
+# covers exact matches of the secret string.
+#
+# Run it from Actions -> Probe SMTP TLS capability -> Run workflow.
+# See smkwlab/.github#182.
+name: Probe SMTP TLS capability
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  probe:
+    name: Probe
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe the lab SMTP server
+        env:
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+        run: |
+          set -u
+
+          if [ -z "${SMTP_SERVER}" ] || [ -z "${SMTP_PORT}" ]; then
+            echo "::error::SMTP_SERVER / SMTP_PORT are not visible from this repository."
+            echo "::error::Widen the visibility of the organization secrets, or run this from a repository that already sees them."
+            exit 1
+          fi
+
+          case "${SMTP_PORT}" in
+            465) echo "port      : 465 (implicit TLS) -- the action defaults 'secure' to true" ;;
+            587) echo "port      : 587 (submission) -- the action defaults 'secure' to false" ;;
+            25)  echo "port      : 25 (smtp) -- the action defaults 'secure' to false" ;;
+            *)   echo "port      : none of 465, 587 or 25 -- the action defaults 'secure' to false" ;;
+          esac
+
+          if timeout 15 nc -z -w 15 "${SMTP_SERVER}" "${SMTP_PORT}"; then
+            echo "reachable : yes"
+          else
+            echo "reachable : no -- the runner cannot open a TCP connection"
+            echo "::warning::Unreachable from a GitHub runner means notify-ml-on-pr is not delivering mail either."
+            exit 1
+          fi
+
+          if [ "${SMTP_PORT}" = "465" ]; then
+            if timeout 30 openssl s_client -connect "${SMTP_SERVER}:${SMTP_PORT}" -brief </dev/null >/dev/null 2>&1; then
+              echo "tls       : yes -- encrypted from the first byte"
+              echo "verdict   : credentials are already protected. require_tls would be inert; nothing to change."
+            else
+              echo "tls       : no -- the port is open but TLS did not negotiate"
+              echo "::warning::Port 465 with no working TLS. Investigate the server before changing the workflow."
+            fi
+          else
+            if timeout 30 openssl s_client -starttls smtp -connect "${SMTP_SERVER}:${SMTP_PORT}" -brief </dev/null >/dev/null 2>&1; then
+              echo "starttls  : yes -- the server advertises STARTTLS"
+              echo "verdict   : credentials are encrypted today, but only opportunistically. Setting require_tls: true makes it mandatory and changes nothing else."
+            else
+              echo "starttls  : no -- the server does not advertise STARTTLS"
+              echo "::warning::Credentials are being sent in clear text today."
+              echo "verdict   : require_tls: true would stop the notifications rather than fix this. Fix the transport first -- STARTTLS on the server, or implicit TLS on 465."
+            fi
+          fi

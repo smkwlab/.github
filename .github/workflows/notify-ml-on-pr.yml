@@ -87,6 +87,12 @@ jobs:
         with:
           server_address: ${{ secrets.SMTP_SERVER }}
           server_port: ${{ secrets.SMTP_PORT }}
+          # SMTP_PORT is 587, so `secure` stays false and the connection opens
+          # in clear text and rises to TLS only if the server offers STARTTLS.
+          # It does today -- measured by the Probe SMTP TLS capability workflow
+          # -- but nothing would announce it if that stopped. Refuse to send
+          # rather than hand the credentials over unencrypted.
+          require_tls: true
           username: ${{ secrets.SMTP_USERNAME }}
           password: ${{ secrets.SMTP_PASSWORD }}
           subject: "[PR] ${{ github.event.repository.name }}: ${{ github.event.pull_request.title }}"

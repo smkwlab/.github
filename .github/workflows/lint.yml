@@ -1,6 +1,7 @@
 # Lint Workflows
 #
-# Validates GitHub Actions workflow files using actionlint.
+# Validates GitHub Actions workflow files using actionlint, and the Renovate
+# preset invariants that no validator checks.
 #
 # Runs on every pull request rather than only on workflow changes: this is the
 # repository's required status check, and a path filter would leave pull
@@ -27,3 +28,49 @@ jobs:
 
       - name: Run actionlint
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+
+      # Two invariants hold the texlive image out of auto-merge, and until now
+      # both were only sentences in a description. The rule is duplicated in
+      # latex.json and renovate.json because neither configuration extends the
+      # other, and in each file it has to sit after the rules that switch
+      # auto-merge on, since Renovate applies packageRules in order and the last
+      # match wins. Editing one copy, or reordering the rules, would put student
+      # facing image tags back under the bot behind a diff that looks harmless.
+      # renovate-config-validator checks neither. This does.
+      #
+      # It runs in this job rather than its own so that it sits inside the
+      # repository's required status check.
+      - name: Check the Renovate preset invariants
+        run: |
+          set -euo pipefail
+          image='ghcr.io/smkwlab/texlive-ja-textlint'
+
+          rule_of() {
+            jq -c --arg img "$image" '
+              [.packageRules[] | select(.matchPackageNames // [] | index($img))]
+              | if length == 1 then (.[0] | del(.description))
+                else error("expected exactly one rule for \($img) in this file, found \(length)")
+                end' "$1"
+          }
+
+          a=$(rule_of latex.json)
+          b=$(rule_of renovate.json)
+          if [ "$a" != "$b" ]; then
+            echo "::error::latex.json and renovate.json disagree about ${image}. Both copies have to change together."
+            printf '  latex.json    : %s\n' "$a"
+            printf '  renovate.json : %s\n' "$b"
+            exit 1
+          fi
+
+          for f in latex.json renovate.json; do
+            if ! jq -e --arg img "$image" '
+              [.packageRules | to_entries[] | select(.value.automerge == true) | .key] as $on
+              | ([.packageRules | to_entries[]
+                  | select(.value.matchPackageNames // [] | index($img)) | .key] | first) as $off
+              | (($on | length) == 0) or ($off > ($on | max))' "$f" >/dev/null; then
+              echo "::error::${f}: the ${image} rule must come after every rule that sets automerge, or it stops winning."
+              exit 1
+            fi
+          done
+
+          echo "Renovate preset invariants hold."

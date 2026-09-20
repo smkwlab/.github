@@ -50,7 +50,7 @@
       "automerge": true
     },
     {
-      "description": "Order the texlive-ja-textlint tags correctly wherever they are referenced. The tag scheme is YYYY[revision-letter] (2025g, 2026a), which the default docker versioning mis-reads -- it treated bare 2025 as newer than 2025g. This rule lived only in the .github repository's own configuration, so every repository consuming this preset was ordering those tags by the default rules; it did not show because 2026e is currently the newest tag. The candidate filter also keeps the alpine/debian/amd64/test/latest variants out. Both managers that see this image are covered: the Dockerfile FROM in latex-release-action and the container image in its test workflow.",
+      "description": "Order the texlive-ja-textlint tags correctly wherever they are referenced. The tag scheme is YYYY[revision-letter] (2025g, 2026a), which the default docker versioning mis-reads -- it treated bare 2025 as newer than 2025g. This rule lived only in the .github repository's own configuration, so every repository consuming this preset was ordering those tags by the default rules; it did not show because 2026e is currently the newest tag. The candidate filter also keeps the alpine/debian/amd64/test/latest variants out. The revision letter is optional in it because a bare year is a real tag: 2025 exists, alongside 2025a through 2025i, and it is the one the default versioning sorted above them. Both managers that see this image are covered: the Dockerfile FROM in latex-release-action and the container image in its test workflow.",
       "matchPackageNames": ["ghcr.io/smkwlab/texlive-ja-textlint"],
       "versioning": "loose",
       "allowedVersions": "/^20\\d{2}[a-z]?$/"

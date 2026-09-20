@@ -85,3 +85,65 @@ jobs:
           done
 
           echo "Renovate preset invariants hold."
+
+      # Two invariants about what may auto-merge, which no validator reads.
+      #
+      # A. custom.regex updates must not auto-merge beyond patch. What lets
+      #    github-actions and mix auto-merge a minor is that CI proves it: a
+      #    green pull request has exercised the thing being updated. That does
+      #    not hold for the versions custom.regex manages here. They are the
+      #    workflow_call input defaults of elixir-ci.yml, and this repository's
+      #    pull request CI never runs a reusable workflow -- actionlint is all
+      #    that runs. #189 moved OTP to 29.1 behind a green check that had
+      #    verified nothing about OTP; it took running the matrix in a consumer
+      #    to know. Nothing in the configuration said so, which leaves a later
+      #    reader looking at a gap rather than a decision, and gaps get filled.
+      #
+      #    Rules with no matchManagers count, because the org-wide rule in
+      #    default.json has none and widening it would reach custom.regex too.
+      #    Rules with no matchUpdateTypes count for the same reason: absent
+      #    means every type, so what has to be caught is the absence, not the
+      #    word "minor". An earlier draft of this check missed exactly that.
+      #
+      # B. A's premise, asserted on its own. Should this repository's pull
+      #    request CI ever run elixir-ci.yml, A stops being right -- but only
+      #    if somebody notices. Failing here names A, so whoever adds the
+      #    self-test has to decide about it. The alternative, exempting A
+      #    automatically when a self-test exists, was rejected: reading that
+      #    wrong fails towards merging an unverified toolchain, where reading
+      #    this wrong only fails towards a red check.
+      - name: Check the auto-merge policy invariants
+        run: |
+          set -euo pipefail
+
+          for f in default.json github-actions.json renovate.json; do
+            bad=$(jq -c '
+              [ .packageRules[]?
+                | select(.automerge == true)
+                | select((.matchManagers // null) == null
+                         or ((.matchManagers | index("custom.regex")) != null))
+                | select((.matchUpdateTypes == null)
+                         or (any(.matchUpdateTypes[]; . == "minor" or . == "major")))
+                | {matchManagers, matchUpdateTypes} ]' "$f")
+            if [ "$bad" != '[]' ]; then
+              echo "::error::${f}: custom.regex updates must not auto-merge beyond patch. This repository's pull request CI does not run the reusable workflows, so a toolchain bump here is unverified until a consumer runs it. If that has changed, revisit this rule rather than removing the check."
+              printf '  %s\n' "$bad"
+              exit 1
+            fi
+          done
+
+          set +e
+          callers=$(grep -rlE '^[[:space:]]*uses:[[:space:]]*(\./)?\.github/workflows/elixir-ci\.yml|^[[:space:]]*uses:[[:space:]]*smkwlab/\.github/\.github/workflows/elixir-ci\.yml@' .github/workflows/)
+          rc=$?
+          set -e
+          if [ "$rc" -gt 1 ]; then
+            echo "::error::could not search .github/workflows (grep exited ${rc}). That is a check which failed to run, not a check which passed."
+            exit 1
+          fi
+          if [ -n "$callers" ]; then
+            echo "::error::elixir-ci.yml is called from inside this repository now, which is the premise the rule above rests on. Re-read that rule: if pull request CI genuinely exercises the matrix, a minor auto-merge may be justified."
+            printf '  %s\n' $callers
+            exit 1
+          fi
+
+          echo "Auto-merge policy invariants hold."

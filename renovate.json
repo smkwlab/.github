@@ -22,10 +22,11 @@
       "enabled": false
     },
     {
-      "description": "texlive-ja-textlint uses a custom YYYY[revision-letter] tag scheme (e.g. 2025g, 2026a). The default docker versioning mis-orders it (it treated bare 2025 as newer than 2025g). Use loose versioning and restrict candidates to plain year tags so Renovate orders them correctly and ignores the alpine/debian/amd64/test/latest variants.",
+      "description": "texlive-ja-textlint uses a custom YYYY[revision-letter] tag scheme (e.g. 2025g, 2026a), which the default docker versioning mis-orders. Loose versioning fixes the ordering between years but not within one: it too sorts a bare 2025 above 2025g. Require the revision letter so the bare tag leaves the candidate set, and the alpine/debian/amd64/test/latest variants with it. This repository needs its own copy because latex-build-modified.yml runs in that container and this configuration does not extend the latex preset, which carries the same rule for the repositories that do; change the pattern or the versioning in both. Auto-merge is off for this image whatever the update type says. A new tag changes the textlint rules students are linted against, which the tag audit calls a human decision; loose reports 2026e to 2026f as a patch, so without this the org-wide patch rule would have merged it unattended.",
       "matchPackageNames": ["ghcr.io/smkwlab/texlive-ja-textlint"],
+      "automerge": false,
       "versioning": "loose",
-      "allowedVersions": "/^20\\d{2}[a-z]?$/"
+      "allowedVersions": "/^20\\d{2}[a-z]+$/"
     },
     {
       "description": "OTP tags a maintenance release with a fourth component (27.3.4.16), which is not semver, hence loose versioning. Loose does not recognise a pre-release either, so restrict candidates to all-numeric versions and leave the rc tags out.",

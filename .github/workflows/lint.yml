@@ -1,6 +1,7 @@
 # Lint Workflows
 #
-# Validates GitHub Actions workflow files using actionlint.
+# Validates GitHub Actions workflow files using actionlint, and the Renovate
+# preset invariants that no validator checks.
 #
 # Runs on every pull request rather than only on workflow changes: this is the
 # repository's required status check, and a path filter would leave pull
@@ -27,3 +28,60 @@ jobs:
 
       - name: Run actionlint
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+
+      # Two invariants hold the texlive image out of auto-merge, and on their own
+      # they are only sentences in a description. The rule is duplicated in
+      # latex.json and renovate.json because neither configuration extends the
+      # other, and the last packageRule to match is the one Renovate obeys.
+      # Editing one copy, or reordering the rules, would put student-facing image
+      # tags back under the bot behind a diff that looks harmless.
+      # renovate-config-validator checks neither. This does.
+      #
+      # What is asserted is the invariant itself -- the last rule deciding
+      # auto-merge for the image turns it off, and nothing that turns it on
+      # follows -- not the shape it currently takes. Splitting it into several
+      # rules stays legal.
+      #
+      # It runs in this job rather than its own so that it sits inside the
+      # repository's required status check.
+      - name: Check the Renovate preset invariants
+        run: |
+          set -euo pipefail
+          image='ghcr.io/smkwlab/texlive-ja-textlint'
+
+          rules_of() {
+            jq -S -c --arg img "$image" \
+              '[.packageRules[] | select(.matchPackageNames // [] | index($img)) | del(.description)]' "$1"
+          }
+
+          a=$(rules_of latex.json)
+          b=$(rules_of renovate.json)
+          if [ "$a" != "$b" ]; then
+            echo "::error::latex.json and renovate.json disagree about ${image}. Both copies have to change together."
+            printf '  latex.json    : %s\n' "$a"
+            printf '  renovate.json : %s\n' "$b"
+            exit 1
+          fi
+
+          # The two index sets do different jobs. $on is every rule that turns
+          # auto-merge on, named or generic, and is what catches a generic rule
+          # added after the image's own -- the dockerfile minor rule does not
+          # name the image, so it can only be seen this way. $off is the image's
+          # last word about itself, and catches the rule being flipped or
+          # deleted.
+          for f in latex.json renovate.json; do
+            if ! jq -e --arg img "$image" '
+              (.packageRules | to_entries) as $rs
+              | [$rs[] | select(.value.automerge == true) | .key] as $on
+              | ([$rs[] | select((.value.matchPackageNames // []) | index($img))
+                       | select(.value | has("automerge")) | .key] | last) as $off
+              | if $off == null then false
+                elif $rs[$off].value.automerge != false then false
+                elif (($on | length) > 0) and ($off < ($on | max)) then false
+                else true end' "$f" >/dev/null; then
+              echo "::error::${f}: the last rule deciding automerge for ${image} must set it to false, and no rule setting it true may follow."
+              exit 1
+            fi
+          done
+
+          echo "Renovate preset invariants hold."

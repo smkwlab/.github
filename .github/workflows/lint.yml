@@ -63,6 +63,12 @@ jobs:
             exit 1
           fi
 
+          # The two index sets do different jobs. $on is every rule that turns
+          # auto-merge on, named or generic, and is what catches a generic rule
+          # added after the image's own -- the dockerfile minor rule does not
+          # name the image, so it can only be seen this way. $off is the image's
+          # last word about itself, and catches the rule being flipped or
+          # deleted.
           for f in latex.json renovate.json; do
             if ! jq -e --arg img "$image" '
               (.packageRules | to_entries) as $rs

@@ -22,7 +22,7 @@
       "enabled": false
     },
     {
-      "description": "texlive-ja-textlint uses a custom YYYY[revision-letter] tag scheme (e.g. 2025g, 2026a), which the default docker versioning mis-orders. Loose versioning fixes the ordering between years but not within one: it too sorts a bare 2025 above 2025g. Require the revision letter so the bare tag leaves the candidate set, and the alpine/debian/amd64/test/latest variants with it.",
+      "description": "texlive-ja-textlint uses a custom YYYY[revision-letter] tag scheme (e.g. 2025g, 2026a), which the default docker versioning mis-orders. Loose versioning fixes the ordering between years but not within one: it too sorts a bare 2025 above 2025g. Require the revision letter so the bare tag leaves the candidate set, and the alpine/debian/amd64/test/latest variants with it. This repository needs its own copy because latex-build-modified.yml runs in that container and this configuration does not extend the latex preset, which carries the same rule for the repositories that do; change the pattern or the versioning in both.",
       "matchPackageNames": ["ghcr.io/smkwlab/texlive-ja-textlint"],
       "versioning": "loose",
       "allowedVersions": "/^20\\d{2}[a-z]+$/"

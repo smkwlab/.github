@@ -44,18 +44,12 @@ permissions:
 jobs:
   dependency-audit:
     # This half is Elixir-specific -- it installs a toolchain and runs mix_audit
-    # over mix.lock -- while the secret scan below is not. A repository without
-    # mix.exs therefore cannot call this workflow at all: the audit fails on
-    # `mix deps.get`, so the only way to get the secret scan was to not call it.
-    #
-    # That is why several repositories have no secret scanning of any kind.
-    # smkwlab/.github itself is one, as is dns-ecosystem and four private
-    # template repositories; being private, the last five cannot fall back on
-    # GitHub's native scanning either, which needs Advanced Security.
-    #
-    # The default keeps every existing caller unchanged. Only a caller that
-    # says so explicitly loses the audit, and what it gains is the half it
-    # could not reach before.
+    # over mix.lock -- while the secret scan below is not. Welded together they
+    # put a repository with no mix.exs in a bind: calling this workflow fails
+    # on `mix deps.get`, and not calling it gives up the secret scan too. That
+    # is how a repository ends up with no secret scanning at all, and on a
+    # private one that is the end of it, native scanning needing Advanced
+    # Security. The default leaves every existing caller unchanged.
     if: ${{ inputs.run-dependency-audit }}
     runs-on: ubuntu-latest
     name: Dependency Security Audit

@@ -86,6 +86,48 @@ jobs:
 
           echo "Renovate preset invariants hold."
 
+      # ワークフローの本文から scripts/README.md の節へリンクしている。見出しを
+      # 書き換えてもリンクは壊れず、ファイル先頭に着くだけなので、読み手は
+      # それらしい場所に降りたまま何も失われたことに気付かない。この repo で
+      # 「間違っても落ちない参照」はここだけなので、ここで落とす。
+      - name: Check that documentation anchors resolve
+        run: |
+          set -euo pipefail
+          status=0
+
+          refs=$(grep -ho "blob/main/[^ )\"']*#[^ )\"']*" .github/workflows/*.yml | sort -u || true)
+          # 抽出が空なのは「リンクが無い」とは限らず、書き方が変わって
+          # パターンが当たらなくなっただけかもしれない。黙って通さない
+          if [ -z "$refs" ]; then
+            echo "::error::ワークフローから README へのリンクが 1 件も見つからない。抽出パターンが当たらなくなっている可能性がある"
+            exit 1
+          fi
+
+          while IFS= read -r ref; do
+            file=${ref#blob/main/}
+            file=${file%%#*}
+            anchor=${ref#*#}
+
+            if [ ! -f "$file" ]; then
+              echo "::error::${file} はワークフローからリンクされているが存在しない。"
+              status=1
+              continue
+            fi
+
+            # 見出しの文字列をそのままアンカーにしている前提。英語の複数語
+            # 見出しを足すなら、GitHub の slug 規則（小文字化・空白をハイフンに）
+            # に合わせてここを広げること
+            if ! grep -qxF "## ${anchor}" "$file" && ! grep -qxF "### ${anchor}" "$file"; then
+              echo "::error::${file} に見出し「${anchor}」が無いが、ワークフローが #${anchor} へリンクしている。"
+              status=1
+            fi
+          done <<<"$refs"
+
+          if [ "$status" -eq 0 ]; then
+            echo "Documentation anchors resolve."
+          fi
+          exit "$status"
+
       # Two invariants about what may auto-merge, which no validator reads.
       #
       # A. custom.regex updates must not auto-merge beyond patch. What lets

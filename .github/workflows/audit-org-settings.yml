@@ -1,0 +1,189 @@
+# Org Settings Audit
+#
+# Renovate と secret scanning の稼働は、リポジトリ側のファイルと GitHub 上の
+# 設定が揃って初めて成立する。後者はバージョン管理外にあり、欠けても何も
+# 言わない。実例が二度あった（issue #198）: App の対象から 11 リポジトリが
+# 漏れて 4 か月、それが解消されたことに 26 日。欠落と解消の両方を見落として
+# いる。
+#
+# 起点は org の全リポジトリにする。エコシステム単位で数えると、どちらにも
+# 属さないものが構造的に見えない。実際 secret scanning の棚卸しを latex 側と
+# DNS 側が別々にやり、両方とも自分の枠しか見ていなかった。
+#
+# 是正はここからは行わない。App への追加も secret scanning の有効化も、
+# 何を対象にするかの判断を含むため人が決める。
+name: Audit Org Settings
+
+"on":
+  schedule:
+    # 毎週月曜 11:00 JST（02:00 UTC）。同じ月曜に走る他の 2 監査から離して、
+    # 報告 Issue が同時に立たないようにする
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    # 報告と取り下げが同じ Issue を指す必要がある。二箇所に書くと、片方だけ
+    # 変えたときに「報告はするが閉じない」状態になり、気付く手段が無い。
+    env:
+      TITLE: "org の設定とリポジトリの宣言が一致しない"
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      # secret が無いときに skip すると、何も見ていない監査が success を出し、
+      # 「確認済み」と誤読される。設定漏れは黙らせずに落とす。
+      - name: Check that the App credentials are configured
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APP_ID" ] || [ -z "$APP_PRIVATE_KEY" ]; then
+            echo "::error::APP_ID / APP_PRIVATE_KEY が未設定。scripts/README.md の有効化手順を参照"
+            exit 1
+          fi
+
+      # org の全リポジトリを列挙する必要がある。この App は
+      # repository_selection=all なので、Renovate App の対象外リポジトリも
+      # 見える。ここが selected だと、監査自身が探しているものと同じ盲点を
+      # 持つことになる。
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 乖離があればスクリプトは非ゼロで終わる。ここで落とさず、報告まで進む。
+      - name: Audit
+        id: audit
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          # API 呼び出しはリポジトリ数に比例する。195 リポジトリで約 370 回、
+          # 所要 150 秒ほど。週次なので 5000 req/h には遠いが、先に効いてくるのは
+          # 実行時間のほう。リポジトリ数が数倍になったら GraphQL への置き換えを
+          # 検討すること。
+          #
+          # tee にパイプしないこと。パイプラインの終了ステータスは tee のものに
+          # なるため、乖離があっても常に clean=true になる。
+          if bash scripts/audit-org-settings.sh --quiet > audit.log 2>&1; then
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat audit.log
+
+      # Issue はこのリポジトリに立てるので github.token で足りる。App に
+      # issues: write を持たせない。
+      - name: Report drift
+        if: steps.audit.outputs.clean != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "リポジトリ側の宣言と GitHub 上の設定が一致しない箇所があります。"
+            echo "後者はバージョン管理外にあるため、欠けても誰も気付きません。"
+            echo
+            echo '```'
+            cat audit.log
+            echo '```'
+            echo
+            echo "分類ごとに対処が違います。"
+            echo
+            echo "- **drift**: renovate 設定があるのに Dependency Dashboard が無い。"
+            echo "  Renovate App の対象に入っていない可能性が高いです"
+            echo "  （Organization Settings → GitHub Apps → Renovate → Repository access）。"
+            echo "  public なのに secret scanning が無効な場合もここに出ます"
+            echo "- **leak**: 学生リポジトリが renovate 設定を持っています。テンプレートの"
+            echo "  内容は生成物にコピーされるため、テンプレート側を直さないと増え続けます"
+            echo "- **unknown**: 権限やレスポンスの都合で確認できなかったものです。"
+            echo "  「異常なし」ではありません"
+            echo
+            echo "info の一覧は判断待ちで、異常ではありません。ただし新しく作られた"
+            echo "リポジトリはここに出るので、対象にすべきものが混ざっていないか見てください。"
+            echo
+            echo "実行: ${RUN_URL}"
+          } > report.md
+
+          # 週次で回るので、既存の報告があれば追記する。毎週新しい Issue が
+          # 積み上がると、どれが現状か分からなくなる。
+          #
+          # --search は全文検索なので、この文言を含む別の Issue を拾いうるし、
+          # インデックスの遅れで直前に立てた Issue を見落として二重に立てうる。
+          # 一覧を取って題名の完全一致で選ぶ。
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,title)
+          existing=$(jq -r '[.[] | select(.title == env.TITLE) | .number] | first // empty' <<<"$issues")
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file report.md
+          else
+            # 上限に張り付いた状態で見つからないのは、「無い」ではなく
+            # 「見えていない」かもしれない。そのまま作ると報告が二重になり、
+            # どちらが現状か分からなくなる。Close 側と同じガードを置く。
+            if [ "$(jq 'length' <<<"$issues")" -ge 100 ]; then
+              echo "::error::開いている Issue が一覧の上限に達している。既存の報告を見落として二重に起票する可能性があるため中止する"
+              exit 1
+            fi
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" --body-file report.md
+          fi
+
+      # 揃っていれば前回の報告を閉じる。報告するだけで取り下げない監視は、
+      # 是正後も開いたままの Issue を残す。読む側はそれが現状を指しているか
+      # 分からず、実物を確かめ直すことになる（#161 がそうなった）。
+      - name: Close the report once the drift is gone
+        if: steps.audit.outputs.clean == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 題名の完全一致で選ぶ。理由は Report drift の同じ検索と同じ。
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,title)
+          existing=$(jq -r '.[] | select(.title == env.TITLE) | .number' <<<"$issues")
+
+          if [ -z "$existing" ]; then
+            # 上限に張り付いた状態で見つからないのは、「無い」ではなく
+            # 「見えていない」かもしれない。黙って成功させると閉じ忘れが
+            # 成功として通るので、そのときだけは落とす。
+            if [ "$(jq 'length' <<<"$issues")" -ge 100 ]; then
+              echo "::error::開いている Issue が一覧の上限に達している。報告を見落とした可能性があるため確認すること"
+              exit 1
+            fi
+            echo "開いている報告は無い。閉じるものが無い"
+            exit 0
+          fi
+
+          {
+            echo "宣言と設定が一致したことを確認したので閉じます。"
+            echo
+            echo '```'
+            cat audit.log
+            echo '```'
+            echo
+            echo "実行: ${RUN_URL}"
+          } > resolved.md
+
+          # 同名の報告が複数あれば全部閉じる。Report drift は先頭にしか追記
+          # しないので、2 本目以降は更新されないまま開き続ける。
+          while read -r number; do
+            [ -n "$number" ] || continue
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file resolved.md
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed
+          done <<<"$existing"
+
+      # 報告を投げてから落とす。Actions の一覧でも赤く見えるようにする。
+      - name: Fail if drift was found
+        if: steps.audit.outputs.clean != 'true'
+        run: |
+          echo "::error::宣言と設定が一致しない。詳細は起票された Issue を参照"
+          exit 1

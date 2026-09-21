@@ -33,6 +33,10 @@ jobs:
     env:
       TITLE: "org の設定とリポジトリの宣言が一致しない"
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      # 担当の定義は README にあるが、読まれるのは Issue のほう。見出しへの
+      # アンカー付きで渡す。アンカーが変わってもファイル先頭には着くので、
+      # 節名を本文にも残しておく
+      OWNERS_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/scripts/README.md#報告の担当
     steps:
       # secret が無いときに skip すると、何も見ていない監査が success を出し、
       # 「確認済み」と誤読される。設定漏れは黙らせずに落とす。
@@ -113,7 +117,7 @@ jobs:
             echo
             echo "この監査は org 全体を見るので、報告にはどのエコシステムにも属さない"
             echo "リポジトリが混ざります。drift / leak / unknown は latex 側が対処し、"
-            echo "info には担当を置いていません（scripts/README.md の「報告の担当」）。"
+            echo "info には担当を置いていません（[scripts/README.md の「報告の担当」](${OWNERS_URL})）。"
             echo
             echo "実行: ${RUN_URL}"
           } > report.md

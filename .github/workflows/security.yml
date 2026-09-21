@@ -31,6 +31,11 @@ on:
         default: 10
         required: false
         type: number
+      run-dependency-audit:
+        description: 'Run the Elixir dependency audit. Turn it off in a repository with no mix.exs.'
+        default: true
+        required: false
+        type: boolean
 
 permissions:
   contents: read
@@ -38,6 +43,14 @@ permissions:
 
 jobs:
   dependency-audit:
+    # This half is Elixir-specific -- it installs a toolchain and runs mix_audit
+    # over mix.lock -- while the secret scan below is not. Welded together they
+    # put a repository with no mix.exs in a bind: calling this workflow fails
+    # on `mix deps.get`, and not calling it gives up the secret scan too. That
+    # is how a repository ends up with no secret scanning at all, and on a
+    # private one that is the end of it, native scanning needing Advanced
+    # Security. The default leaves every existing caller unchanged.
+    if: ${{ inputs.run-dependency-audit }}
     runs-on: ubuntu-latest
     name: Dependency Security Audit
     timeout-minutes: ${{ inputs.dependency-audit-timeout }}

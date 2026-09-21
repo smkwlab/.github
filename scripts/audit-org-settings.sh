@@ -38,7 +38,14 @@ set -eu
 
 ORG="${ORG:-smkwlab}"
 # 「稼働中」の境界。info 一覧を読める長さに保つためのもので、判定には使わない。
-ACTIVE_SINCE="${ACTIVE_SINCE:-$(date -u -d '90 days ago' '+%Y-%m-%d' 2>/dev/null || date -u -v-90d '+%Y-%m-%d')}"
+# GNU date と BSD date で書式が違うので両方試す。どちらも駄目なら空になり、
+# 文字列比較が常に真になって全リポジトリが info に並ぶ。静かに壊れるより
+# 止める。
+ACTIVE_SINCE="${ACTIVE_SINCE:-$(date -u -d '90 days ago' '+%Y-%m-%d' 2>/dev/null || date -u -v-90d '+%Y-%m-%d' 2>/dev/null || true)}"
+if ! printf '%s' "$ACTIVE_SINCE" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+    echo "ERROR: ACTIVE_SINCE を決められなかった（GNU/BSD どちらの date も使えない）。YYYY-MM-DD を明示してください" >&2
+    exit 1
+fi
 
 QUIET=false
 if [ "${1:-}" = "--quiet" ]; then

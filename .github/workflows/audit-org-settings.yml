@@ -28,6 +28,11 @@ permissions:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    # 報告と取り下げが同じ Issue を指す必要がある。二箇所に書くと、片方だけ
+    # 変えたときに「報告はするが閉じない」状態になり、気付く手段が無い。
+    env:
+      TITLE: "org の設定とリポジトリの宣言が一致しない"
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       # secret が無いときに skip すると、何も見ていない監査が success を出し、
       # 「確認済み」と誤読される。設定漏れは黙らせずに落とす。
@@ -78,8 +83,6 @@ jobs:
         if: steps.audit.outputs.clean != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TITLE: "org の設定とリポジトリの宣言が一致しない"
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           {
             echo "リポジトリ側の宣言と GitHub 上の設定が一致しない箇所があります。"
@@ -129,8 +132,6 @@ jobs:
         if: steps.audit.outputs.clean == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TITLE: "org の設定とリポジトリの宣言が一致しない"
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           # 題名の完全一致で選ぶ。理由は Report drift の同じ検索と同じ。
           issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \

@@ -61,7 +61,7 @@ unsure() { unknown=$((unknown + 1)); log "  unknown: $1"; }
 # 学生リポジトリは Renovate の対象外（方針）。命名規約で見分ける。
 # 規約が変われば見分けが付かなくなるが、宣言リストを別に持つと、その
 # リストが今度は誰も見ていない設定になる（#198 本文）。
-is_student() { printf '%s' "$1" | grep -qE '^k[0-9]{2}'; }
+is_student() { [[ $1 =~ ^k[0-9]{2} ]]; }
 
 err_file=$(mktemp)
 repos_file=$(mktemp)
@@ -82,16 +82,17 @@ log "対象: ${total} リポジトリ (org: ${ORG}, アーカイブ除く)"
 no_renovate=""
 
 while read -r line; do
-    name=$(printf '%s' "$line" | jq -r '.name')
-    vis=$(printf '%s' "$line" | jq -r '.visibility')
-    pushed=$(printf '%s' "$line" | jq -r '.pushed' | cut -c1-10)
-    ss=$(printf '%s' "$line" | jq -r '.ss // "unknown"')
+    # 1 リポジトリあたり jq を 4 回呼ぶと 195 回分の起動コストになる。
+    # 1 回の @tsv でまとめて取り出す。
+    IFS=$'\t' read -r name vis pushed ss <<<"$(printf '%s' "$line" \
+        | jq -r '[.name, .visibility, (.pushed | .[0:10]), (.ss // "unknown")] | @tsv')"
 
     # 1. Renovate の設定ファイルがあるのに Dependency Dashboard が無い
     #    = App の対象から漏れている。dependencyDashboard は default preset に
     #    あるので、Renovate が一度でも走れば issue が立つ。
     has_config=false
-    for path in "renovate.json" ".github/renovate.json"; do
+    # org の慣行は .github/renovate.json なので先に見る。見つかれば 1 回で済む。
+    for path in ".github/renovate.json" "renovate.json"; do
         if gh api "repos/${ORG}/${name}/contents/${path}" --jq '.name' >/dev/null 2>&1; then
             has_config=true
             break
@@ -102,8 +103,16 @@ while read -r line; do
         # App に入っていないのは正しい。設定ファイルが配られていることが問題。
         leaked "${name}: 学生リポジトリに renovate 設定がある（テンプレート由来）"
     elif [ "$has_config" = true ]; then
-        if dash=$(gh api "repos/${ORG}/${name}/issues?state=open&per_page=100" \
-                    --jq '[.[] | select(.title == "Dependency Dashboard")] | length' 2>"$err_file"); then
+        # --paginate が要る。open issue が 100 件を超えるリポジトリでは
+        # Dashboard があっても 1 ページ目に無く、drift と誤報する。
+        # 「見つからない」と「見えていない」を混同しないのがこの監査の主旨
+        # なので、監査自身がそれをやってはいけない。
+        # 取得と判定を分ける。パイプで繋ぐと終了ステータスが後段のものになり、
+        # gh の失敗が jq の出す 0 に化けて「Dashboard が無い」と誤報する。
+        if pages=$(gh api "repos/${ORG}/${name}/issues?state=open&per_page=100" --paginate \
+                     --jq '[.[] | select(.title == "Dependency Dashboard")] | length' 2>"$err_file"); then
+            # --paginate はページごとに 1 行出すので合算する
+            dash=$(printf '%s\n' "$pages" | jq -s 'add // 0')
             if [ "$dash" -eq 0 ]; then
                 report "${name}: renovate 設定はあるが Dependency Dashboard が無い（App の対象外の可能性）"
             elif [ "$QUIET" != "true" ]; then

@@ -154,7 +154,9 @@ if [ "${#no_renovate[@]}" -gt 0 ]; then
     n=${#no_renovate[@]}
     log "---"
     log "info: renovate 設定を持たない稼働中リポジトリ ${n} 件（${ACTIVE_SINCE} 以降に push。対象外の判断は人が行う）"
-    printf '%s\n' "${no_renovate[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed 's/^/    /'
+    # fold -s は折り返し位置の空白を行末に残す。ログ上は見えないが、
+    # コピーして使う人が末尾の空白を拾うので落とす。
+    printf '%s\n' "${no_renovate[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed -e 's/ *$//' -e 's/^/    /'
 fi
 
 log "---"

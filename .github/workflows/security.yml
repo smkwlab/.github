@@ -3,22 +3,41 @@
 # Usage:
 #   jobs:
 #     security:
-#       uses: smkwlab/.github/.github/workflows/security.yml@v1.1.0
+#       uses: smkwlab/.github/.github/workflows/security.yml@v1
 #       secrets: inherit
+#
+#   A repository with no mix.exs turns the Elixir half off and keeps the
+#   secret scan:
+#
+#     with:
+#       run-dependency-audit: false
 
 name: Security (Reusable)
 
 on:
   workflow_call:
     inputs:
+      # These are workflow_call input defaults, which the github-actions
+      # manager does not see -- it reads `uses:` references only. Left
+      # unmanaged they rot, and this pair had: OTP 29.0.2 / Elixir 1.20.1
+      # against the 29.1 / 1.20.4 that elixir-ci.yml runs its latest column
+      # on. #146 fixed that rot in elixir-ci.yml and #147 put a manager on it
+      # so it would not come back; this file was not in either. The
+      # annotations below are what that manager reads, and renovate.json now
+      # lists this file alongside elixir-ci.yml.
+      #
+      # The depNames match elixir-ci.yml's latest column deliberately, so the
+      # two files move in one pull request instead of drifting apart again.
       otp-version:
         description: 'OTP version'
-        default: '29.0.2'
+        # renovate: datasource=github-releases depName=erlang/otp packageName=erlang/otp versioning=loose extractVersion=^OTP-(?<version>.*)$
+        default: '29.1'
         required: false
         type: string
       elixir-version:
         description: 'Elixir version'
-        default: '1.20.1'
+        # renovate: datasource=github-releases depName=elixir-lang/elixir packageName=elixir-lang/elixir versioning=semver extractVersion=^v(?<version>.*)$
+        default: '1.20.4'
         required: false
         type: string
       dependency-audit-timeout:

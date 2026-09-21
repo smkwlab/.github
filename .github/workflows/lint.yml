@@ -181,7 +181,8 @@ jobs:
           done
 
           set +e
-          callers=$(grep -rlE '^[[:space:]]*uses:[[:space:]]*(\./)?\.github/workflows/elixir-ci\.yml|^[[:space:]]*uses:[[:space:]]*smkwlab/\.github/\.github/workflows/elixir-ci\.yml@' .github/workflows/)
+          managed='(elixir-ci|security)'
+          callers=$(grep -rlE "^[[:space:]]*uses:[[:space:]]*(\./)?\.github/workflows/${managed}\.yml|^[[:space:]]*uses:[[:space:]]*smkwlab/\.github/\.github/workflows/${managed}\.yml@" .github/workflows/)
           rc=$?
           set -e
           if [ "$rc" -gt 1 ]; then
@@ -189,7 +190,7 @@ jobs:
             exit 1
           fi
           if [ -n "$callers" ]; then
-            echo "::error::elixir-ci.yml is called from inside this repository now, which is the premise the rule above rests on. Re-read that rule: if pull request CI genuinely exercises the matrix, a minor auto-merge may be justified."
+            echo "::error::a workflow whose toolchain this manager bumps is called from inside this repository now, which is the premise the rule above rests on. Re-read that rule: if pull request CI genuinely exercises the toolchain, a minor auto-merge may be justified."
             printf '%s\n' "$callers" | sed 's/^/  /'
             exit 1
           fi

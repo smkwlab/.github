@@ -3,7 +3,7 @@
 # Usage:
 #   jobs:
 #     ci:
-#       uses: smkwlab/.github/.github/workflows/elixir-ci.yml@main
+#       uses: smkwlab/.github/.github/workflows/elixir-ci.yml@v1
 #
 # See: https://github.com/smkwlab/tenbin_dns/issues/60
 

@@ -79,7 +79,7 @@ fi
 total=$(wc -l < "$repos_file" | tr -d ' ')
 log "対象: ${total} リポジトリ (org: ${ORG}, アーカイブ除く)"
 
-no_renovate=""
+no_renovate=()
 
 while read -r line; do
     # 1 リポジトリあたり jq を 4 回呼ぶと 195 回分の起動コストになる。
@@ -122,7 +122,7 @@ while read -r line; do
             unsure "${name}: issue を取得できなかった: $(tr '\n' ' ' < "$err_file" | cut -c1-120)"
         fi
     elif ! is_student "$name" && [ "$pushed" \> "$ACTIVE_SINCE" ]; then
-        no_renovate="${no_renovate}${name} "
+        no_renovate+=("$name")
     fi
 
     # 2. public なのに secret scanning が無効
@@ -143,11 +143,11 @@ done < "$repos_file"
 # 休眠リポジトリまで並べると 170 行になり、読まれない一覧は無いのと同じに
 # なる。直近に動いているものだけに絞る。新しく作られたリポジトリはここに
 # 出るので、気付く手段としては保たれる。
-if [ -n "$no_renovate" ]; then
-    n=$(printf '%s' "$no_renovate" | wc -w | tr -d ' ')
+if [ "${#no_renovate[@]}" -gt 0 ]; then
+    n=${#no_renovate[@]}
     log "---"
     log "info: renovate 設定を持たない稼働中リポジトリ ${n} 件（${ACTIVE_SINCE} 以降に push。対象外の判断は人が行う）"
-    printf '%s' "$no_renovate" | tr ' ' '\n' | grep -v '^$' | sort | paste -sd' ' - | fold -w 100 -s | sed 's/^/    /'
+    printf '%s\n' "${no_renovate[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed 's/^/    /'
 fi
 
 log "---"

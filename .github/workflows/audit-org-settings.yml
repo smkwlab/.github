@@ -68,6 +68,11 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           ORG: ${{ github.repository_owner }}
         run: |
+          # API 呼び出しはリポジトリ数に比例する。195 リポジトリで約 370 回、
+          # 所要 150 秒ほど。週次なので 5000 req/h には遠いが、先に効いてくるのは
+          # 実行時間のほう。リポジトリ数が数倍になったら GraphQL への置き換えを
+          # 検討すること。
+          #
           # tee にパイプしないこと。パイプラインの終了ステータスは tee のものに
           # なるため、乖離があっても常に clean=true になる。
           if bash scripts/audit-org-settings.sh --quiet > audit.log 2>&1; then
@@ -115,12 +120,20 @@ jobs:
           # --search は全文検索なので、この文言を含む別の Issue を拾いうるし、
           # インデックスの遅れで直前に立てた Issue を見落として二重に立てうる。
           # 一覧を取って題名の完全一致で選ぶ。
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
-            --json number,title \
-            --jq '[.[] | select(.title == env.TITLE) | .number] | first // empty')
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,title)
+          existing=$(jq -r '[.[] | select(.title == env.TITLE) | .number] | first // empty' <<<"$issues")
+
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file report.md
           else
+            # 上限に張り付いた状態で見つからないのは、「無い」ではなく
+            # 「見えていない」かもしれない。そのまま作ると報告が二重になり、
+            # どちらが現状か分からなくなる。Close 側と同じガードを置く。
+            if [ "$(jq 'length' <<<"$issues")" -ge 100 ]; then
+              echo "::error::開いている Issue が一覧の上限に達している。既存の報告を見落として二重に起票する可能性があるため中止する"
+              exit 1
+            fi
             gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$TITLE" --body-file report.md
           fi

@@ -111,6 +111,10 @@ jobs:
             echo "info の一覧は判断待ちで、異常ではありません。ただし新しく作られた"
             echo "リポジトリはここに出るので、対象にすべきものが混ざっていないか見てください。"
             echo
+            echo "この監査は org 全体を見るので、報告にはどのエコシステムにも属さない"
+            echo "リポジトリが混ざります。drift / leak / unknown は latex 側が対処し、"
+            echo "info には担当を置いていません（scripts/README.md の「報告の担当」）。"
+            echo
             echo "実行: ${RUN_URL}"
           } > report.md
 

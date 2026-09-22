@@ -1,0 +1,31 @@
+# Caller template: Security -- a secret scan, plus an Elixir dependency audit.
+# Distributed by scripts/distribute-workflow.sh as
+# .github/workflows/security.yml in each target repository.
+# The ref / run-dependency-audit tokens below are substituted at distribution time.
+#
+# The two halves are independent. The secret scan (trufflehog) is
+# language-agnostic, and on a private repository it is the only secret scan
+# available: native scanning needs Advanced Security there, so without this
+# caller such a repository has none at all. The dependency audit assumes
+# mix.exs and fails on `mix deps.get` without one, which is what
+# run-dependency-audit turns off.
+#
+# That token has no default on purpose. The answer differs per repository,
+# and a wrong guess either fails the run or drops the audit with nothing to
+# say so. Distribution refuses to proceed until it is given.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 1 * * 1'
+
+jobs:
+  security:
+    uses: smkwlab/.github/.github/workflows/security.yml@__REF__
+    with:
+      run-dependency-audit: __RUN_DEPENDENCY_AUDIT__
+    secrets: inherit

@@ -28,6 +28,7 @@ smkwlab organization 運用補助スクリプト。
 | `prevent-draft-merge` | `.github/workflows/prevent-draft-merge.yml` | draft PR の誤マージ防止 | draft ブランチ運用（無ければ休眠） |
 | `sync-next-draft` | `.github/workflows/sync-next-draft.yml` | 適用済み Suggestion を次稿ブランチへ伝播 | draft ブランチ運用（無ければ休眠） |
 | `notify-ml-on-pr` | `.github/workflows/notify-ml-on-pr.yml` | PR 作成を研究室 ML へメール通知 | org secret `SMTP_*` / `LAB_ML_ADDRESS`（6 種） |
+| `security` | `.github/workflows/security.yml` | secret scan（trufflehog）+ Elixir 依存脆弱性監査 | `--var RUN_DEPENDENCY_AUDIT=true\|false` の明示指定（既定なし） |
 
 `scripts/distribute-workflow.sh --list-callers` で一覧できます。各 caller の前提は
 `scripts/callers/<caller>.pr-note.md`（PR 本文に付く注記）にも書かれています。

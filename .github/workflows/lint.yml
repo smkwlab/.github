@@ -180,19 +180,34 @@ jobs:
             fi
           done
 
-          set +e
-          managed='(elixir-ci|security)'
-          callers=$(grep -rlE "^[[:space:]]*uses:[[:space:]]*(\./)?\.github/workflows/${managed}\.yml|^[[:space:]]*uses:[[:space:]]*smkwlab/\.github/\.github/workflows/${managed}\.yml@" .github/workflows/)
-          rc=$?
-          set -e
-          if [ "$rc" -gt 1 ]; then
-            echo "::error::could not search .github/workflows (grep exited ${rc}). That is a check which failed to run, not a check which passed."
+          # 対象は renovate.json から読む。ここに名前を書き写すと、manager に
+          # 3 本目を足した人が片方だけ直したとき、前提チェックだけが黙って
+          # 手薄になる。落ちないので気付けない
+          managed=$(jq -r '.customManagers[]?.managerFilePatterns[]?' renovate.json)
+          if [ -z "$managed" ]; then
+            echo "::error::renovate.json から custom manager の対象ファイルを読めなかった。何の前提を確かめるのか分からないまま通すことになる"
             exit 1
           fi
-          if [ -n "$callers" ]; then
-            echo "::error::a workflow whose toolchain this manager bumps is called from inside this repository now, which is the premise the rule above rests on. Re-read that rule: if pull request CI genuinely exercises the toolchain, a minor auto-merge may be justified."
-            printf '%s\n' "$callers" | sed 's/^/  /'
-            exit 1
-          fi
+
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            # 正規表現に埋めるのでメタ文字を落とす。いまの名前に無くても、
+            # 名前のほうが後から変わる
+            esc=$(printf '%s' "${path##*/}" | sed 's/[][\\.^$*+?(){}|]/\\&/g')
+
+            set +e
+            callers=$(grep -rlE "^[[:space:]]*uses:[[:space:]]*(\./)?\.github/workflows/${esc}|^[[:space:]]*uses:[[:space:]]*smkwlab/\.github/\.github/workflows/${esc}@" .github/workflows/)
+            rc=$?
+            set -e
+            if [ "$rc" -gt 1 ]; then
+              echo "::error::could not search .github/workflows (grep exited ${rc}). That is a check which failed to run, not a check which passed."
+              exit 1
+            fi
+            if [ -n "$callers" ]; then
+              echo "::error::${path##*/} is called from inside this repository now, and this manager bumps its toolchain. That is the premise the rule above rests on. Re-read that rule: if pull request CI genuinely exercises the toolchain, a minor auto-merge may be justified."
+              printf '%s\n' "$callers" | sed 's/^/  /'
+              exit 1
+            fi
+          done <<<"$managed"
 
           echo "Auto-merge policy invariants hold."

@@ -18,16 +18,13 @@ on:
   workflow_call:
     inputs:
       # These are workflow_call input defaults, which the github-actions
-      # manager does not see -- it reads `uses:` references only. Left
-      # unmanaged they rot, and this pair had: OTP 29.0.2 / Elixir 1.20.1
-      # against the 29.1 / 1.20.4 that elixir-ci.yml runs its latest column
-      # on. #146 fixed that rot in elixir-ci.yml and #147 put a manager on it
-      # so it would not come back; this file was not in either. The
-      # annotations below are what that manager reads, and renovate.json now
-      # lists this file alongside elixir-ci.yml.
+      # manager does not see -- it reads `uses:` references only, so left
+      # unmanaged they rot. The annotations below are read by the custom
+      # manager in renovate.json, which lists this file and elixir-ci.yml.
       #
-      # The depNames match elixir-ci.yml's latest column deliberately, so the
-      # two files move in one pull request instead of drifting apart again.
+      # The depNames match elixir-ci.yml's latest column deliberately: equal
+      # values mean one pull request moves both files, so they cannot drift
+      # apart. They already had, to 29.0.2 / 1.20.1 against 29.1 / 1.20.4.
       otp-version:
         description: 'OTP version'
         # renovate: datasource=github-releases depName=erlang/otp packageName=erlang/otp versioning=loose extractVersion=^OTP-(?<version>.*)$

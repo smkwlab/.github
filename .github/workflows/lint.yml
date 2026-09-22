@@ -183,14 +183,34 @@ jobs:
           # 対象は renovate.json から読む。ここに名前を書き写すと、manager に
           # 3 本目を足した人が片方だけ直したとき、前提チェックだけが黙って
           # 手薄になる。落ちないので気付けない
-          managed=$(jq -r '.customManagers[]?.managerFilePatterns[]?' renovate.json)
+          #
+          # 上の制限は matchManagers: ["custom.regex"] にかかっているので、
+          # 前提を確かめる範囲もそれに合わせる
+          managed=$(jq -r '.customManagers[]? | select(.customType == "regex") | .managerFilePatterns[]?' renovate.json)
           if [ -z "$managed" ]; then
-            echo "::error::renovate.json から custom manager の対象ファイルを読めなかった。何の前提を確かめるのか分からないまま通すことになる"
+            echo "::error::renovate.json に custom.regex の manager が 1 つも無い。上の制限はその manager にかかっているので、前提そのものが変わったか、renovate.json が読めていないかのどちらか。空と読み違えたまま通さない"
             exit 1
           fi
 
+          checked=0
           while IFS= read -r path; do
             [ -n "$path" ] || continue
+
+            # uses: で呼ばれうるのはワークフローだけ。Dockerfile などを
+            # 管理する manager が増えても、それは呼び出せないので対象外
+            case "$path" in
+              .github/workflows/*) ;;
+              *) continue ;;
+            esac
+
+            # ここから先はベースネームを取り出す前提。managerFilePatterns には
+            # グロブも正規表現も書けるので、その形が来ると当たらないだけの
+            # 検査になる。黙って通さず、書いた人に直させる
+            if ! printf '%s' "$path" | grep -qE '^[A-Za-z0-9._/-]+\.yml$'; then
+              echo "::error::managerFilePatterns の ${path} が素のパスでない。この検査はベースネームを取り出す前提なので、グロブや正規表現を使うならここも直すこと"
+              exit 1
+            fi
+
             # 正規表現に埋めるのでメタ文字を落とす。いまの名前に無くても、
             # 名前のほうが後から変わる
             esc=$(printf '%s' "${path##*/}" | sed 's/[][\\.^$*+?(){}|]/\\&/g')
@@ -208,6 +228,8 @@ jobs:
               printf '%s\n' "$callers" | sed 's/^/  /'
               exit 1
             fi
+            checked=$((checked + 1))
           done <<<"$managed"
 
-          echo "Auto-merge policy invariants hold."
+          # 何本見たかを出す。covered と assumed の区別がログに残る
+          echo "Auto-merge policy invariants hold (${checked} workflow(s) checked)."

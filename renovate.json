@@ -7,9 +7,9 @@
   "enabledManagers": ["github-actions", "custom.regex"],
   "customManagers": [
     {
-      "description": "The OTP and Elixir versions the Elixir CI matrix runs on are workflow_call input defaults, which the github-actions manager does not see -- it reads `uses:` references only. Left unmanaged they simply rot: the LTS OTP pin sat twelve patch releases behind before anyone noticed (#146). Each default carries a `# renovate:` annotation naming its upstream, and this manager turns the pair into a dependency. Every key is written out on every annotation rather than made optional, so that the pattern has no optional groups to leave empty.",
+      "description": "The OTP and Elixir versions the shared workflows run on are workflow_call input defaults, which the github-actions manager does not see -- it reads `uses:` references only. Left unmanaged they simply rot: the LTS OTP pin sat twelve patch releases behind before anyone noticed (#146), and security.yml, which this manager did not cover at first, drifted a minor behind elixir-ci.yml's latest column the same way. Each default carries a `# renovate:` annotation naming its upstream, and this manager turns the pair into a dependency. Every key is written out on every annotation rather than made optional, so that the pattern has no optional groups to leave empty. A shared workflow that pins a toolchain has to be listed here too.",
       "customType": "regex",
-      "managerFilePatterns": [".github/workflows/elixir-ci.yml"],
+      "managerFilePatterns": [".github/workflows/elixir-ci.yml", ".github/workflows/security.yml"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) packageName=(?<packageName>\\S+) versioning=(?<versioning>\\S+) extractVersion=(?<extractVersion>\\S+)\\s+default: '(?<currentValue>[^']+)'"
       ]

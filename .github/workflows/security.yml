@@ -28,7 +28,7 @@ on:
       otp-version:
         description: 'OTP version'
         # renovate: datasource=github-releases depName=erlang/otp packageName=erlang/otp versioning=loose extractVersion=^OTP-(?<version>.*)$
-        default: '29.1'
+        default: '29.1.1'
         required: false
         type: string
       elixir-version:

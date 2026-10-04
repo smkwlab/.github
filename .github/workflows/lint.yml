@@ -40,6 +40,10 @@ jobs:
       # 動き、ランナーの PATH にバイナリを置かないため（呼ぶと 127 で落ちる）。
       # リポジトリの workflow と名前がぶつからないよう接頭辞を付ける。commit
       # されることはなく、CI の checkout 上にだけ存在する。
+      #
+      # actionlint を通ったら次のステップで消す。残すと、この下の前提チェックが
+      # zz-caller-security.yml を security.yml の呼び出し元として数えてしまう
+      # （検査としては正しい反応で、実際にそう読める行がある）。
       - name: Render the caller templates for actionlint
         run: |
           set -euo pipefail
@@ -79,6 +83,17 @@ jobs:
 
       - name: Run actionlint
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+
+      # 役目は終わり。以降のチェックはリポジトリが実際に持つ workflow だけを
+      # 見る必要がある。actionlint が落ちても消す
+      - name: Drop the rendered caller templates
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          rendered=(.github/workflows/zz-caller-*.yml)
+          rm -f "${rendered[@]}"
+          echo "${#rendered[@]} 件の展開ファイルを削除した"
 
       # Two invariants hold the texlive image out of auto-merge, and on their own
       # they are only sentences in a description. The rule is duplicated in

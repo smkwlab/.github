@@ -3,6 +3,13 @@
   "extends": ["github>smkwlab/.github:latex#v1"],
   "description": [
     "Document templates. The configuration currently matches the latex preset exactly, but the constraint behind it is different and the seam is worth keeping: a template's contents are copied verbatim into every student repository generated from it, and those repositories have no Renovate. Anything pinned in a template is frozen there for good, whatever the infrastructure repositories decide to do.",
-    "The shared-workflow reference is kept on the moving v1 tag by the latex preset, which is why no rule is repeated here. Should that preset ever pin it again, this preset is where the templates opt back out."
-  ]
+    "The shared-workflow reference is kept on the moving v1 tag by the latex preset, which is why no rule is repeated here. Should that preset ever pin it again, this preset is where the templates opt back out.",
+    "Lock file maintenance gets the full two-day window here, not the six hours the latex preset gives it. A schedule never starts a run, so a window is only reachable if a job happens to land inside it, and how often jobs land is a property of the repository, not of the preset. The latex window was calibrated on texlive-ja-textlint, whose jobs arrived at 07:57, 11:57, 14:57, 17:57 and 21:57 Tokyo -- two of them inside six hours from 6am, which is what one refresh needs. Templates are the quiet end of the organisation and do not get that cadence. ise-report-template has produced four Renovate pull requests in six months; three of them were created within one minute of each other at 01:09 Tokyo on a Saturday, and not one of its pull requests, ever, was created inside the Friday 6am window. Its lock file maintenance has consequently never run -- zero merged, against twelve in ai-academic-paper-reviewer on the same latex window, whose Friday jobs land at 01, 04, 06, 07, 08, 10, 11 and 15.",
+    "The reason the latex preset keeps that window narrow does not transfer either. There, merging a refresh restores the difference between the lock file and the registry within hours, so the next job inside a wide window creates another pull request -- seven of them across two repositories over three days. That churn needs several jobs per window to happen, which is exactly what these repositories do not have. One job a week cannot loop.",
+    "Only ise-report-template carries a lock file, so this is a no-op for the other templates. It stays here rather than in that repository because the window belongs to the preset layer: a repository-level override would be invisible from the configuration that sets the window it overrides."
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["on friday and saturday"]
+  }
 }

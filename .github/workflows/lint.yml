@@ -26,8 +26,111 @@ jobs:
       - name: Set up Git repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # caller テンプレートは配布されるまで誰にも検査されない。壊れていても
+      # 分かるのは distribute-workflow.sh を実行したときで、しかも対象
+      # リポジトリに PR が立ってからになる。
+      #
+      # テンプレートは __TOKEN__ を含むので、そのままでは workflow として
+      # 読めない。配布時と同じく <caller>.defaults を当て、残ったトークンに
+      # は値を入れて埋める。検査したいのは YAML と workflow の構造で、値の
+      # 妥当性ではない。
+      #
+      # 下の actionlint に拾わせるため、結果を .github/workflows/ に置く。
+      # 自前で actionlint を呼ばないのは、rhysd/actionlint が Docker の中で
+      # 動き、ランナーの PATH にバイナリを置かないため（呼ぶと 127 で落ちる）。
+      # リポジトリの workflow と名前がぶつからないよう接頭辞を付ける。commit
+      # されることはなく、CI の checkout 上にだけ存在する。
+      #
+      # actionlint を通ったら次のステップで消す。残すと、この下の前提チェックが
+      # zz-caller-security.yml を security.yml の呼び出し元として数えてしまう
+      # （検査としては正しい反応で、実際にそう読める行がある）。
+      - name: Render the caller templates for actionlint
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          templates=(scripts/callers/*.yml)
+          if [ "${#templates[@]}" -eq 0 ]; then
+            echo "::error::scripts/callers/ に caller テンプレートが 1 件も無い。置き場所が変わったか、この検査が対象を失っている"
+            exit 1
+          fi
+
+          for t in "${templates[@]}"; do
+            name=$(basename "$t" .yml)
+            body=$(cat "$t")
+
+            # 配布時と同じ既定値を当てる
+            if [ -f "scripts/callers/${name}.defaults" ]; then
+              while IFS= read -r line; do
+                case "$line" in ''|'#'*) continue ;; esac
+                key=${line%%=*}
+                val=${line#*=}
+                # CRLF で保存された .defaults の値に \r が残ると、置換した先が
+                # __KEY__\r のようになって当たらない
+                val=${val%$'\r'}
+                # 値にトークン形が混ざると、下の総ざらいがそれを拾って
+                # 置き換えてしまう。配布時も同じ順で置換するので、ここで止める
+                case "$val" in
+                  *__*)
+                    echo "::error::scripts/callers/${name}.defaults の ${key} の値にトークン形 (__) が含まれている: ${val}"
+                    exit 1
+                    ;;
+                esac
+                body=${body//__${key}__/${val}}
+              done < "scripts/callers/${name}.defaults"
+            fi
+
+            # __REF__ だけは実際に使う形（タグ名）を入れる。uses: の ref に
+            # 当たるので、適当な文字列だと検査の意味が変わる。.defaults が REF
+            # を持つならそちらが先に当たり、ここは何もしない。
+            #
+            # 配布時の既定値と一致している必要は無い。actionlint が見るのは
+            # ref の形だけで、解決はしない。将来 v2 に移っても、ここが v1 の
+            # ままでも検査の結果は変わらない
+            body=${body//__REF__/v1}
+
+            # 残りは配布時に --var で渡すもの。構造の検査に値は要らないので
+            # 総ざらいで埋める。
+            #
+            # 回数で縛るのは、置換した先が再びトークンに見えると終わらない
+            # ため。lint-placeholder はアンダースコアを含まないので当たらない
+            # が、ここを書き換えた人が気付ける必要がある。CI が落ちるのは
+            # 直せるが、回り続けるのは直せない
+            for _ in $(seq 1 100); do
+              [[ "$body" =~ __([A-Za-z0-9_]+)__ ]] || break
+              body=${body//__${BASH_REMATCH[1]}__/lint-placeholder}
+            done
+            if [[ "$body" =~ __([A-Za-z0-9_]+)__ ]]; then
+              echo "::error::${name}: 100 回置換してもトークンが残っている (__${BASH_REMATCH[1]}__)。原因は 2 つ: 埋めた値が再びトークンに見えている（この行の置換先を変えた場合）か、テンプレートが 100 種類を超えるトークンを持っている"
+              exit 1
+            fi
+
+            printf '%s\n' "$body" > ".github/workflows/zz-caller-${name}.yml"
+          done
+
+          echo "${#templates[@]} 件のテンプレートを zz-caller-*.yml として展開した"
+
       - name: Run actionlint
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+
+      # 役目は終わり。以降のチェックはリポジトリが実際に持つ workflow だけを
+      # 見る必要がある。actionlint が落ちても消す
+      - name: Drop the rendered caller templates
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          rendered=(.github/workflows/zz-caller-*.yml)
+          # 展開ステップが落ちていれば 0 件になる（if: always() なのでここは走る）。
+          # set -u のもとで空配列を "${arr[@]}" と展開すると、bash 4.4 より前は
+          # unbound variable で落ちる。ランナーは 5 系なので今は通るが、
+          # 通る理由がランナーの版であるべきではない
+          # 削除そのものが失敗したら落とす（set -e のまま）。消し残すと
+          # この下のチェックが展開ファイルを本物の workflow として数える
+          if [ "${#rendered[@]}" -gt 0 ]; then
+            rm -f "${rendered[@]}"
+          fi
+          echo "${#rendered[@]} 件の展開ファイルを削除した"
 
       # Two invariants hold the texlive image out of auto-merge, and on their own
       # they are only sentences in a description. The rule is duplicated in

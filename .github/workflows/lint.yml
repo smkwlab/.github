@@ -26,6 +26,57 @@ jobs:
       - name: Set up Git repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # caller テンプレートは配布されるまで誰にも検査されない。壊れていても
+      # 分かるのは distribute-workflow.sh を実行したときで、しかも対象
+      # リポジトリに PR が立ってからになる。
+      #
+      # テンプレートは __TOKEN__ を含むので、そのままでは workflow として
+      # 読めない。配布時と同じく <caller>.defaults を当て、残ったトークンに
+      # は値を入れて埋める。検査したいのは YAML と workflow の構造で、値の
+      # 妥当性ではない。
+      #
+      # 下の actionlint に拾わせるため、結果を .github/workflows/ に置く。
+      # 自前で actionlint を呼ばないのは、rhysd/actionlint が Docker の中で
+      # 動き、ランナーの PATH にバイナリを置かないため（呼ぶと 127 で落ちる）。
+      # リポジトリの workflow と名前がぶつからないよう接頭辞を付ける。commit
+      # されることはなく、CI の checkout 上にだけ存在する。
+      - name: Render the caller templates for actionlint
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          templates=(scripts/callers/*.yml)
+          if [ "${#templates[@]}" -eq 0 ]; then
+            echo "::error::scripts/callers/ に caller テンプレートが 1 件も無い。置き場所が変わったか、この検査が対象を失っている"
+            exit 1
+          fi
+
+          for t in "${templates[@]}"; do
+            name=$(basename "$t" .yml)
+            body=$(cat "$t")
+
+            # 配布時と同じ既定値を当てる
+            if [ -f "scripts/callers/${name}.defaults" ]; then
+              while IFS= read -r line; do
+                case "$line" in ''|'#'*) continue ;; esac
+                key=${line%%=*}
+                val=${line#*=}
+                body=${body//__${key}__/${val}}
+              done < "scripts/callers/${name}.defaults"
+            fi
+
+            # 既定値の無いトークンは配布時に --var で渡すもの。構造の検査には
+            # 値そのものは要らないので、残りをまとめて埋める
+            body=${body//__REF__/v1}
+            while [[ "$body" =~ __([A-Za-z0-9_]+)__ ]]; do
+              body=${body//__${BASH_REMATCH[1]}__/lint-placeholder}
+            done
+
+            printf '%s\n' "$body" > ".github/workflows/zz-caller-${name}.yml"
+          done
+
+          echo "${#templates[@]} 件のテンプレートを zz-caller-*.yml として展開した"
+
       - name: Run actionlint
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
 
@@ -85,65 +136,6 @@ jobs:
           done
 
           echo "Renovate preset invariants hold."
-
-      # caller テンプレートは配布されるまで誰にも検査されない。壊れていても
-      # 分かるのは distribute-workflow.sh を実行したときで、しかも対象
-      # リポジトリに PR が立ってからになる。ここで落とす。
-      #
-      # テンプレートは __TOKEN__ を含むので、そのままでは workflow として
-      # 読めない。配布時と同じく <caller>.defaults を当て、残ったトークンに
-      # は値を入れて埋める。検査したいのは YAML と workflow の構造で、値の
-      # 妥当性ではない。
-      #
-      # actionlint はファイルを明示すれば git リポジトリの外でも検査する
-      # （引数なしだと "no project was found" で exit 3）。レンダリング結果を
-      # 一時ディレクトリに置いて、そのファイルを名指しで渡す。
-      - name: Lint the caller templates
-        run: |
-          set -euo pipefail
-
-          out=$(mktemp -d)
-          trap 'rm -rf "${out}"' EXIT
-
-          shopt -s nullglob
-          templates=(scripts/callers/*.yml)
-          if [ "${#templates[@]}" -eq 0 ]; then
-            echo "::error::scripts/callers/ に caller テンプレートが 1 件も無い。置き場所が変わったか、この検査が対象を失っている"
-            exit 1
-          fi
-
-          rendered=()
-          for t in "${templates[@]}"; do
-            name=$(basename "$t" .yml)
-            body=$(cat "$t")
-
-            # 配布時と同じ既定値を当てる
-            if [ -f "scripts/callers/${name}.defaults" ]; then
-              while IFS= read -r line; do
-                case "$line" in ''|'#'*) continue ;; esac
-                key=${line%%=*}
-                val=${line#*=}
-                body=${body//__${key}__/${val}}
-              done < "scripts/callers/${name}.defaults"
-            fi
-
-            # 既定値の無いトークンは配布時に --var で渡すもの。構造の検査には
-            # 値そのものは要らないので、残りをまとめて埋める
-            body=${body//__REF__/v1}
-            while [[ "$body" =~ __([A-Za-z0-9_]+)__ ]]; do
-              body=${body//__${BASH_REMATCH[1]}__/lint-placeholder}
-            done
-
-            printf '%s\n' "$body" > "${out}/${name}.yml"
-            rendered+=("${name}.yml")
-          done
-
-          echo "${#rendered[@]} 件のテンプレートをレンダリングして検査する"
-          # 一時ディレクトリへ移ってから名指しで渡す。絶対パスのまま渡すと
-          # 診断が ../../../var/folders/... で始まり、どのテンプレートの話か
-          # 読み取りにくくなる
-          (cd "${out}" && actionlint "${rendered[@]}")
-          echo "Caller templates lint clean."
 
       # ワークフローの本文から scripts/README.md の節へリンクしている。見出しを
       # 書き換えてもリンクは壊れず、ファイル先頭に着くだけなので、読み手は

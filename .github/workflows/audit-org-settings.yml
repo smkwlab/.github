@@ -93,6 +93,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+
           {
             echo "リポジトリ側の宣言と GitHub 上の設定が一致しない箇所があります。"
             echo "後者はバージョン管理外にあるため、欠けても誰も気付きません。"
@@ -154,6 +156,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+
           # 題名の完全一致で選ぶ。理由は Report drift の同じ検索と同じ。
           issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
             --json number,title)

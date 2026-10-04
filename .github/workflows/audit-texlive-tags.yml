@@ -75,6 +75,8 @@ jobs:
           TITLE: "texlive-ja-textlint のタグがリポジトリ間でずれている"
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          set -euo pipefail
+
           {
             echo "\`config/texlive-tag-refs.json\` の source of truth と、各リポジトリが"
             echo "名乗っているタグが一致しません。"
@@ -125,6 +127,8 @@ jobs:
           TITLE: "texlive-ja-textlint のタグがリポジトリ間でずれている"
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          set -euo pipefail
+
           # 題名の完全一致で選ぶ。理由は Report drift の同じ検索と同じ。
           issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
             --json number,title)

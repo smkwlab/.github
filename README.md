@@ -28,7 +28,6 @@ smkwlab organization の共通設定および Reusable Workflows を管理する
 | `auto-final-merge.yml` | final-* タグ push 時に main への提出 PR を作成（マージは教員） | 卒論テンプレート |
 | `ai-review.yml` | ワンショット LLM（Claude/Gemini）による PR 自動レビュー（CODE / ACADEMIC） | 全テンプレート |
 | `claude-qa.yml` | `@claude` メンションへのワンショット QA 回答（質問＋diff＋変更 `.tex` 全文＋会話履歴 → Messages API 1回、エージェントなし） | 全テンプレート |
-| `ai-reviewer.yml` | Gemini AI による PR 自動レビュー（旧基盤・`ai-review.yml` に統合予定） | 既存リポジトリ |
 | `notify-ml-on-pr.yml` | PR 作成時にメーリングリストへ通知 | 卒論・ISE レポート |
 
 ### HTML 関連
@@ -103,20 +102,6 @@ jobs:
     secrets: inherit
 ```
 
-#### AI レビュー（シークレット継承が必要）
-
-```yaml
-name: AI Review
-on:
-  pull_request:
-    types: [opened, synchronize]
-
-jobs:
-  review:
-    uses: smkwlab/.github/.github/workflows/ai-reviewer.yml@v1
-    secrets: inherit
-```
-
 #### AI レビュー: Claude（ワンショット・シークレットを明示的に渡す）
 
 ```yaml
@@ -183,7 +168,7 @@ scripts/distribute-workflow.sh --apply ai-paper-review sotsuron-template
 scripts/distribute-workflow.sh --apply --direct ai-code-review my-repo
 ```
 
-既存の別レビュー（旧 `ai-reviewer.yml` 等）がある場合は、配布で追加した後に旧 caller を削除してください（二重レビュー回避）。
+既存の別レビュー caller がある場合は、配布で追加した後に旧 caller を削除してください（二重レビュー回避）。
 
 ### draft ベースの学生リポジトリ
 
@@ -279,20 +264,6 @@ PR 作成時にメーリングリストへ通知メールを送信します。
 `SMTP_PORT` が 465 でなければ接続は平文で始まり、STARTTLS に上がれるかはサーバ次第です。
 上がれない場合は `SMTP_USERNAME` / `SMTP_PASSWORD` が平文で流れます。
 Actions から `Probe SMTP TLS capability` を手動実行すると、シークレットの値を出さずに判定できます（#182）。
-
-### ai-reviewer.yml
-
-Gemini AI を使用して PR の自動レビューを行います。
-
-**入力パラメータ:**
-| パラメータ | 必須 | デフォルト | 説明 |
-|-----------|:----:|-----------|------|
-| `language` | No | `Japanese` | レビュー言語 |
-| `exclude-paths` | No | `_build/**,deps/**,cover/**,log/**` | レビュー対象外パス |
-| `timeout-minutes` | No | `10` | タイムアウト（分） |
-
-**必要なシークレット:**
-- `GEMINI_API_KEY`
 
 ### ai-review.yml
 

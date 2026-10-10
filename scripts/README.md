@@ -210,8 +210,19 @@ secret scanning の棚卸しを latex 側と DNS 側が別々に行い、両方�
 
 `info` は異常ではありませんが毎回出します。**一覧が目に入り続けること自体が、新しい
 リポジトリが増えたときに気付く唯一の手段**だからです。休眠リポジトリまで並べると
-170 行になって読まれなくなるので、直近 90 日に push があるものだけに絞っています
+170 行になって読まれなくなるので、一覧は直近 90 日に push があるものだけに絞っています
 （`ACTIVE_SINCE` で変更可）。
+
+**休眠側は件数だけ出します**（執筆時点で 115 件。一覧は `AUDIT_LIST_DORMANT=true`）。
+絞ることと見えなくすることは別で、以前は後者になっていました。`atcoder-container` は
+最終 push が 4 か月前で、patch のある advisory を 2 件抱えたまま `info` にも出て
+いませんでした。**advisory は push ではなく CVE の公開で増えるので、休眠は advisory を
+止めません。**
+
+ただし **advisory そのものはこの監査では点検していません**。監査を動かす App に
+`vulnerability_alerts` 権限が無く、`/repos/{repo}/dependabot/alerts` が読めないためです。
+`repository_selection=all` の App はこの権限を持っておらず、持っているのは Renovate App
+（`selection=selected`）だけです。権限を足せば点検を加えられます。
 
 ### 報告の担当
 

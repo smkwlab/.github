@@ -17,11 +17,18 @@
 #   ./audit-org-settings.sh --quiet      # 一致した項目を出さない
 #
 # Environment:
-#   ORG   対象 org（default: smkwlab）
+#   ORG                  対象 org（default: smkwlab）
+#   ACTIVE_SINCE         「稼働中」の境界（default: 90 日前）
+#   AUDIT_LIST_DORMANT   休眠リポジトリを件数ではなく一覧で出す（default: false）
 #
 # 必要な権限:
 #   metadata: read（リポジトリ一覧）、contents: read（設定ファイルの有無）、
 #   issues: read（Dependency Dashboard の有無）。読み取りのみ。
+#
+#   vulnerability_alerts: read は持っていない。そのため advisory の点検は
+#   行っていない。休眠リポジトリに patch 付きの advisory が溜まっても、この
+#   監査は気付かない（atcoder-container で実際に起きた）。権限を足せば
+#   /repos/{repo}/dependabot/alerts を読んで点検を加えられる。
 #   この監査を動かすトークンは org の全リポジトリを見られる必要がある。
 #   見えないリポジトリは「対象外」と区別が付かず、監査自身が盲点を持つ。
 #
@@ -61,6 +68,8 @@ log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1"; }
 drift=0
 leak=0
 unknown=0
+no_renovate=()
+no_renovate_dormant=()
 report() { drift=$((drift + 1)); log "  drift: $1"; }
 leaked() { leak=$((leak + 1)); log "  leak: $1"; }
 unsure() { unknown=$((unknown + 1)); log "  unknown: $1"; }
@@ -128,8 +137,14 @@ while read -r line; do
         else
             unsure "${name}: issue を取得できなかった: $(tr '\n' ' ' < "$err_file" | cut -c1-120)"
         fi
-    elif ! is_student "$name" && [ "$pushed" \> "$ACTIVE_SINCE" ]; then
-        no_renovate+=("$name")
+    elif ! is_student "$name"; then
+        # 稼働中と休眠を分ける。休眠側は一覧には出さないが、件数は出す。
+        # 出さないと「居ない」のと区別が付かない
+        if [ "$pushed" \> "$ACTIVE_SINCE" ]; then
+            no_renovate+=("$name")
+        else
+            no_renovate_dormant+=("$name")
+        fi
     fi
 
     # 2. public なのに secret scanning が無効
@@ -157,6 +172,24 @@ if [ "${#no_renovate[@]}" -gt 0 ]; then
     # fold -s は折り返し位置の空白を行末に残す。ログ上は見えないが、
     # コピーして使う人が末尾の空白を拾うので落とす。
     printf '%s\n' "${no_renovate[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed -e 's/ *$//' -e 's/^/    /'
+fi
+
+# 4. 休眠側は件数だけ出す。一覧を絞った理由は読める長さを保つことだったが、
+#    絞った結果ゼロ件と区別が付かなくなっていた。advisory は push ではなく
+#    CVE の公開で増えるので、休眠は advisory を止めない。実例として
+#    atcoder-container は最終 push が 4 か月前で、patch のある advisory を
+#    2 件抱えたまま info にも出ていなかった。
+#
+#    advisory そのものはここで点検していない。この監査を動かす App に
+#    vulnerability_alerts 権限が無く、/repos/{repo}/dependabot/alerts が
+#    読めない。権限を足せば点検を加えられる。
+if [ "${#no_renovate_dormant[@]}" -gt 0 ]; then
+    n=${#no_renovate_dormant[@]}
+    log "info: 同じく休眠中（${ACTIVE_SINCE} より前が最終 push）${n} 件。一覧は AUDIT_LIST_DORMANT=true で出る"
+    log "      休眠は advisory を止めない。advisory 自体はこの監査では未点検（App に vulnerability_alerts 権限が無い）"
+    if [ "${AUDIT_LIST_DORMANT:-false}" = "true" ]; then
+        printf '%s\n' "${no_renovate_dormant[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed -e 's/ *$//' -e 's/^/    /'
+    fi
 fi
 
 log "---"

@@ -214,6 +214,8 @@ secret scanning の棚卸しを latex 側と DNS 側が別々に行い、両方�
 （`ACTIVE_SINCE` で変更可）。
 
 **休眠側は件数だけ出します**（執筆時点で 115 件。一覧は `AUDIT_LIST_DORMANT=true`）。
+稼働中・休眠のどちらも **0 件でも行を出します** —— 出さないと「0 件」と「数えていない」が
+同じ見え方になり、この監査が塞いだはずの穴を報告側で作ることになります。
 絞ることと見えなくすることは別で、以前は後者になっていました。`atcoder-container` は
 最終 push が 4 か月前で、patch のある advisory を 2 件抱えたまま `info` にも出て
 いませんでした。**advisory は push ではなく CVE の公開で増えるので、休眠は advisory を

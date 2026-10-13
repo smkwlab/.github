@@ -165,12 +165,16 @@ done < "$repos_file"
 # 休眠リポジトリまで並べると 170 行になり、読まれない一覧は無いのと同じに
 # なる。直近に動いているものだけに絞る。新しく作られたリポジトリはここに
 # 出るので、気付く手段としては保たれる。
+# 件数は 0 でも出す。出さないと「0 件」と「数えていない」が同じ見え方になり、
+# この監査が塞いだはずの穴を報告側で作ることになる。
+log "---"
+log "info: renovate 設定を持たない稼働中リポジトリ ${#no_renovate[@]} 件（${ACTIVE_SINCE} 以降に push。対象外の判断は人が行う）"
 if [ "${#no_renovate[@]}" -gt 0 ]; then
-    n=${#no_renovate[@]}
-    log "---"
-    log "info: renovate 設定を持たない稼働中リポジトリ ${n} 件（${ACTIVE_SINCE} 以降に push。対象外の判断は人が行う）"
     # fold -s は折り返し位置の空白を行末に残す。ログ上は見えないが、
     # コピーして使う人が末尾の空白を拾うので落とす。
+    #
+    # 一覧の printf は 0 件のとき通さない。set -u のもとで空配列を "${arr[@]}"
+    # と展開すると bash 4.4 より前は unbound variable で落ちる（手元の macOS は 3.2）。
     printf '%s\n' "${no_renovate[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed -e 's/ *$//' -e 's/^/    /'
 fi
 
@@ -183,13 +187,10 @@ fi
 #    advisory そのものはここで点検していない。この監査を動かす App に
 #    vulnerability_alerts 権限が無く、/repos/{repo}/dependabot/alerts が
 #    読めない。権限を足せば点検を加えられる。
-if [ "${#no_renovate_dormant[@]}" -gt 0 ]; then
-    n=${#no_renovate_dormant[@]}
-    log "info: 同じく休眠中（${ACTIVE_SINCE} より前が最終 push）${n} 件。一覧は AUDIT_LIST_DORMANT=true で出る"
-    log "      休眠は advisory を止めない。advisory 自体はこの監査では未点検（App に vulnerability_alerts 権限が無い）"
-    if [ "${AUDIT_LIST_DORMANT:-false}" = "true" ]; then
-        printf '%s\n' "${no_renovate_dormant[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed -e 's/ *$//' -e 's/^/    /'
-    fi
+log "info: 同じく休眠中（${ACTIVE_SINCE} より前が最終 push）${#no_renovate_dormant[@]} 件。一覧は AUDIT_LIST_DORMANT=true で出る"
+log "      休眠は advisory を止めない。advisory 自体はこの監査では未点検（App に vulnerability_alerts 権限が無い）"
+if [ "${AUDIT_LIST_DORMANT:-false}" = "true" ] && [ "${#no_renovate_dormant[@]}" -gt 0 ]; then
+    printf '%s\n' "${no_renovate_dormant[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed -e 's/ *$//' -e 's/^/    /'
 fi
 
 log "---"

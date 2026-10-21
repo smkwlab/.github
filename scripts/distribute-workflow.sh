@@ -156,12 +156,28 @@ for f in "$TEMPLATE" "$NOTE_FILE"; do
   [[ -z "${leftover// /}" ]] || die "$(basename "$f") has unsubstituted tokens: ${leftover}(provide them via --var / --model / --language or a ${CALLER}.defaults file)"
 done
 
+# The reusable this caller calls, taken from the template's own `uses:` line.
+# Deriving it from the caller name instead is right for 8 of the 10 callers,
+# which is why it went unnoticed: ai-code-review and ai-paper-review both call
+# ai-review.yml, so their PR bodies named a path that does not exist.
+# One `uses:` per template today; head -1 keeps a multi-job caller from
+# producing a multi-line path rather than guessing which job to describe.
+REUSABLE=$(render "$TEMPLATE" \
+  | sed -n 's/^[[:space:]]*uses:[[:space:]]*\([^[:space:]]*\).*/\1/p' | head -1)
+
 # Verb depends on whether the target already has the caller (see loop below):
 # "add" for a new file, "update" when --update overwrites an existing one.
 pr_title() { echo "ci: ${1} ${CALLER} caller"; }
 pr_body() {
   local verb_done="Adds"; [[ "$1" == "update" ]] && verb_done="Updates"
-  echo "${verb_done} the shared \`${CALLER}\` workflow as a caller of \`${ORG}/.github/${WORKFLOW_PATH}@${REF}\`."
+  # Fall back to naming only the installed file if the template has no `uses:`.
+  # Such a template is not a caller, but prose is no reason to refuse a
+  # distribution the rest of the script can carry out.
+  if [[ -n "$REUSABLE" ]]; then
+    echo "${verb_done} the shared \`${CALLER}\` workflow as a caller of \`${REUSABLE}\`."
+  else
+    echo "${verb_done} the shared \`${CALLER}\` workflow as \`${WORKFLOW_PATH}\`."
+  fi
   if [[ -f "$NOTE_FILE" ]]; then echo; render "$NOTE_FILE"; fi
 }
 

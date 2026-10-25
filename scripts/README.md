@@ -87,7 +87,11 @@ scripts/distribute-workflow.sh --apply ai-code-review \
    - 可変値は `__REF__` や任意の `__KEY__` トークンで埋め込み、配布時に `--ref` / `--var` で与える
      （GitHub の `${{ ... }}` 式はそのまま残る）
 3. （任意）`scripts/callers/<name>.pr-note.md` に PR 本文へ付ける注記（必要なシークレット等）を書く
-4. `scripts/distribute-workflow.sh <name> <repos...>` で配布
+4. 上の「用意済みの caller テンプレート」表に行を足す。**CI が必須として検査します**
+   （`lint.yml` の *Check that the callers named in the docs exist*）。表と
+   `scripts/callers/` が片方だけ変わった状態、および `*.defaults` /
+   `*.pr-note.md` が `.yml` 無しで残った状態で落ちます
+5. `scripts/distribute-workflow.sh <name> <repos...>` で配布
 
 ### 配布後の確認
 
@@ -102,6 +106,10 @@ caller を追加したら対象リポジトリで動作を確認してくださ�
   以降の新規リポジトリへ伝播します。既存の学生リポジトリへ反映するには
   `thesis-student-registry` の `propagate-workflow`（registry-manager）を併用します
 - 安定運用のため `--ref` はタグ（`v1`）または SHA を推奨（`main` 直参照は避ける）
+- 使用例に書く caller は実在するものにすること。CI が例の caller 位置の引数を
+  取り出して実在を確認します。`distribute-workflow.sh` に新しいオプションを
+  足したときは、その検査の `value_opts` / `flag_opts` にも足す必要があります
+  （足し忘れると CI が「知らないオプション」として落ちます）
 
 ## audit-repo-protection.sh / apply-repo-protection.sh
 

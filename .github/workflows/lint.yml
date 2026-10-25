@@ -332,7 +332,15 @@ jobs:
                 '<'* | '['*) break ;;
                 -*)
                   if [[ "$value_opts" == *" $1 "* ]]; then
-                    shift 2 || break
+                    # 値が無いまま行が終わっているのは、例そのものが不完全。
+                    # 黙って break すると、その行が検査されなかったことが
+                    # 一致と区別できなくなる
+                    if [ "$#" -lt 2 ]; then
+                      echo "::error::${file}:${lineno}: ${1} に値が無い。例が不完全"
+                      status=1
+                      break
+                    fi
+                    shift 2
                   elif [[ "$flag_opts" == *" $1 "* ]]; then
                     shift
                   else

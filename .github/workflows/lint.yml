@@ -323,6 +323,17 @@ jobs:
             pat=${arm%%)*}
             body=${arm#*)}
             case "$pat" in *'*'*) continue ;; esac
+            # arm が複数行に分かれていると body に shift 2 が入らず、値を取る
+            # オプションをフラグと誤分類する。すると例の中でその値が caller の
+            # 位置に見えて、無関係な語を「caller が無い」と報告し始める。
+            # 1 行に収まっていることを前提にしているので、前提が崩れたら落とす
+            case "$body" in
+              *';;'*) ;;
+              *)
+                echo "::error::scripts/distribute-workflow.sh の case 文の arm (${pat}) が 1 行に収まっていない。この導出は 1 行 arm を前提にしている"
+                exit 1
+                ;;
+            esac
             # -h|--help のように 1 つの arm が複数の名前を持つ
             names=${pat//|/ }
             for n in $names; do
@@ -419,6 +430,12 @@ jobs:
                   ;;
               esac
             done
+          #
+          # スクリプト自身も対象に含める。usage() が sed でヘッダのコメントを
+          # そのまま --help の出力にしているので、ヘッダの例は内部コメントでは
+          # なくユーザ向けのヘルプ本文であり、今回の誤りが 4 か月生き延びた
+          # 場所でもある。行頭照合があるので、名前が文の途中に出てくる行
+          # （この grep の行自身を含む）は対象にならない
           done < <(grep -n 'scripts/distribute-workflow\.sh' scripts/README.md scripts/distribute-workflow.sh)
 
           # ここも 0 件を成功にしない。例の書き方が変わって当たらなくなった

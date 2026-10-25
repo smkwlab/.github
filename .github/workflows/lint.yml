@@ -360,7 +360,23 @@ jobs:
                 exit 1
                 ;;
             esac
-            # -h|--help のように 1 つの arm が複数の名前を持つ
+            # 値を取る arm が shift 2 を使うという前提は、崩れても静かに
+            # 誤分類するだけで、ほかの前提のように落ちてはくれない。$2 を
+            # 読んでいるのに shift 2 が無い arm は前提が崩れた印なので落とす
+            # shellcheck disable=SC2016 # ${2 は照合したい文字列そのもの
+            case "$body" in
+              *'${2'*)
+                case "$body" in
+                  *'shift 2'*) ;;
+                  *)
+                    echo "::error::scripts/distribute-workflow.sh の arm (${pat}) は 2 番目の引数を読んでいるが shift 2 が無い。値を取るオプションの判定が shift 2 を前提にしている"
+                    exit 1
+                    ;;
+                esac
+                ;;
+            esac
+            # -h|--help のように 1 つの arm が複数の名前を持つ。グロブを含む
+            # arm は上で落としてあるので、引用符なしの展開でパス名展開は起きない
             names=${pat//|/ }
             for n in $names; do
               case "$n" in -*) ;; *) continue ;; esac

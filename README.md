@@ -339,7 +339,7 @@ jobs:
       (github.event_name == 'issues' &&
         contains(github.event.issue.body, '@claude') &&
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
-    # 不変タグを参照する（エージェント版 reusable は main から削除済み・#62）
+    # 不変タグを参照する（エージェント版 reusable は main から削除済み・#64）
     uses: smkwlab/.github/.github/workflows/claude-mention.yml@v1.18.0
     permissions:
       contents: read         # 助言のみ: エージェントだが編集・コミットはしない
@@ -354,7 +354,7 @@ jobs:
 ```
 
 > [!NOTE]
-> エージェント版 reusable（`claude-mention.yml`）は #62 で main から削除済みです。上の最小例は reusable が最後に含まれていた**不変タグ `v1.18.0`** を参照しているため、削除後もこのまま動作します（floating `v1` では解決できない点に注意）。
+> エージェント版 reusable（`claude-mention.yml`）は #64 で main から削除済みです。上の最小例は reusable が最後に含まれていた**不変タグ `v1.18.0`** を参照しているため、削除後もこのまま動作します（floating `v1` では解決できない点に注意）。
 
 **入力パラメータ:**
 | パラメータ | 必須 | デフォルト | 説明 |

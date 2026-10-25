@@ -20,7 +20,6 @@ smkwlab organization 運用補助スクリプト。
 |--------|----------------|------|-----------|
 | `ai-code-review` | `.github/workflows/ai-code-review.yml` | PR 自動コードレビュー（ワンショット・inline。Gemini/Claude） | org secret `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` |
 | `ai-paper-review` | `.github/workflows/ai-paper-review.yml` | PR 自動論文レビュー（ワンショット・要約。Gemini/Claude） | org secret `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` |
-| `claude-mention` | `.github/workflows/claude-mention.yml` | `@claude` 対話・修正依頼 | org secret `ANTHROPIC_API_KEY` |
 | `claude-qa` | `.github/workflows/claude-qa.yml` | `@claude` 質問応答（回答のみ・修正なし） | org secret `ANTHROPIC_API_KEY` |
 | `latex-build` | `.github/workflows/latex-build.yml` | PR で対象文書一式をビルド、タグでリリース作成 | `--var FILES="..."` の明示指定（既定なし） |
 | `latex-build-modified` | `.github/workflows/latex-build-modified.yml` | push で変更された .tex だけビルド（週報向け） | なし |
@@ -55,13 +54,13 @@ scripts/distribute-workflow.sh --list-callers
 scripts/distribute-workflow.sh --list-candidates
 
 # 1) まず1リポジトリで dry-run（何も変更しない）
-scripts/distribute-workflow.sh claude-mention sotsuron-template
+scripts/distribute-workflow.sh ai-code-review sotsuron-template
 
 # 2) 問題なければ --apply で実行（重要リポジトリは opus）。まずここで検証する
-scripts/distribute-workflow.sh --apply --model opus claude-mention sotsuron-template
+scripts/distribute-workflow.sh --apply --model claude-opus-4-8 ai-code-review sotsuron-template
 
 # 3) 動作を確認してから横展開
-scripts/distribute-workflow.sh --apply claude-mention \
+scripts/distribute-workflow.sh --apply ai-code-review \
   wr-template ise-report-template latex-template poster-template
 ```
 
@@ -72,10 +71,10 @@ scripts/distribute-workflow.sh --apply claude-mention \
 | `--apply` | （dry-run） | 実際に変更する |
 | `--ref <ref>` | `v1` | 呼び出す reusable の参照（`__REF__` を置換）。タグ/ブランチ/SHA |
 | `--var KEY=VALUE` | — | テンプレ/注記中の `__KEY__` を VALUE に置換（複数指定可）。caller 任意のつまみ。`--var` は `--ref`/`--model`/`--language` より優先（例: `--var REF=x` は `--ref` を上書き） |
-| `--model <m>` | — | `--var MODEL=<m>` の別名（Claude caller 用の利便） |
+| `--model <m>` | — | `--var MODEL=<m>` の別名（Claude caller 用の利便）。値は `claude-sonnet-4-6` のような**完全なモデルコード**を渡す（`model_code` としてそのまま API に渡るため、`opus` のような短縮名は実行時まで誤りが分からない） |
 | `--language <lang>` | — | `--var LANGUAGE=<lang>` の別名 |
 | `--direct` | （PR） | デフォルトブランチへ直接コミット（branch protection の無いリポジトリ向け） |
-| `--branch <name>` | `add-<caller>` | PR 用ブランチ名 |
+| `--branch <name>` | `distribute-<caller>` | PR 用ブランチ名 |
 | `--list-callers` | — | caller テンプレートを一覧して終了 |
 | `--list-candidates` | — | 非アーカイブの smkwlab リポジトリを表示して終了 |
 | `-h`, `--help` | — | ヘルプ |

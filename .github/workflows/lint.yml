@@ -316,7 +316,24 @@ jobs:
           # awk のパターンは case 文の 2 スペース字下げに依存している。
           # 字下げや書き方が変われば導出は空になり、下のガードで落ちる。
           # 黙って「オプション無し」として続けないことが要点
-          opt_block=$(awk '/^  case "\$1" in$/ {f=1; next} f && /^  esac$/ {exit} f' scripts/distribute-workflow.sh)
+          # 字下げは awk 側で落とす。pat をそのまま使うとエラーメッセージに
+          # 行頭の空白が入る
+          opt_block=$(awk '/^  case "\$1" in$/ {f=1; next} f && /^  esac$/ {exit} f {sub(/^[[:space:]]+/, ""); print}' scripts/distribute-workflow.sh)
+
+          # 読めなかったのなら、ここで落とす。「オプション無し」として先へ
+          # 進まないため。
+          #
+          # 判定は opt_block が空かどうかで行う。どちらかのカテゴリが空なのは
+          # 正当な状態（値を取るオプションが 1 つも無いスクリプトはあり得る）
+          # なので、読めなかったことと混同しない。
+          #
+          # 下のループより前に置く。空文字を <<< に渡すと空の 1 行が読まれ、
+          # arm の検査が名前の無い arm について誤ったメッセージを出す
+          if [ -z "$opt_block" ]; then
+            echo "::error::scripts/distribute-workflow.sh の case 文を読めなかった。オプション解析の書式が変わっている"
+            exit 1
+          fi
+
           value_opts=" "
           flag_opts=" "
           while IFS= read -r arm; do
@@ -346,12 +363,6 @@ jobs:
             done
           done <<<"$opt_block"
 
-          # 導出が空なら落とす。case 文の書式が変わって読めなくなっただけ
-          # かもしれない
-          if [ "$value_opts" = " " ] || [ "$flag_opts" = " " ]; then
-            echo "::error::scripts/distribute-workflow.sh の case 文からオプションを導出できなかった（value:[${value_opts}] flag:[${flag_opts}]）。オプション解析の書式が変わっている"
-            exit 1
-          fi
 
           examples=0
 
@@ -451,6 +462,9 @@ jobs:
           #    どちらも任意のファイルなので、1 件も無いのは正常な状態（10 caller
           #    のうち .defaults を持つのは 4 件）。ここに 0 件ガードは置かない。
           #    置き場所が消えた場合は検査 1 の *.yml が 0 件で落ちる
+          #    拡張子の剥がしは、1 つのファイル名が両方の接尾辞を持たない
+          #    ことを前提にしている（foo.defaults か foo.pr-note.md のどちらか）。
+          #    前提が崩れた名前でも、探す .yml が見つからず落ちるだけで黙らない
           for f in scripts/callers/*.defaults scripts/callers/*.pr-note.md; do
             n=$(basename "$f")
             n=${n%.defaults}

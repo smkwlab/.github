@@ -312,6 +312,10 @@ jobs:
           #
           # 値を取るかどうかは arm の中身で決まる（shift 2 なら値を取る）。
           # --* や * のようなグロブの arm は literal な名前ではないので除く。
+          #
+          # awk のパターンは case 文の 2 スペース字下げに依存している。
+          # 字下げや書き方が変われば導出は空になり、下のガードで落ちる。
+          # 黙って「オプション無し」として続けないことが要点
           opt_block=$(awk '/^  case "\$1" in$/ {f=1; next} f && /^  esac$/ {exit} f' scripts/distribute-workflow.sh)
           value_opts=" "
           flag_opts=" "
@@ -348,8 +352,15 @@ jobs:
             # バッククォートを外し、コメント記号と字下げを落とす
             text=${text//\`/}
             text=${text#\#}
-            text=${text##[[:space:]]}
-            while [ "${text# }" != "$text" ]; do text=${text# }; done
+            # 先頭の空白をすべて落とす。${text##[[:space:]]} は文字クラスが
+            # 1 文字なので 1 文字しか落ちず、タブ字下げの行が下の照合を
+            # すり抜けて黙って検査対象外になっていた
+            while :; do
+              case "$text" in
+                [[:space:]]*) text=${text#?} ;;
+                *) break ;;
+              esac
+            done
 
             # コマンドが行頭に来ている行だけを例として扱う。散文の途中に
             # 名前が出てくる行（英語なら "distribute-workflow.sh renders the

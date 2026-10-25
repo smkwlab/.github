@@ -107,9 +107,8 @@ caller を追加したら対象リポジトリで動作を確認してくださ�
   `thesis-student-registry` の `propagate-workflow`（registry-manager）を併用します
 - 安定運用のため `--ref` はタグ（`v1`）または SHA を推奨（`main` 直参照は避ける）
 - 使用例に書く caller は実在するものにすること。CI が例の caller 位置の引数を
-  取り出して実在を確認します。`distribute-workflow.sh` に新しいオプションを
-  足したときは、その検査の `value_opts` / `flag_opts` にも足す必要があります
-  （足し忘れると CI が「知らないオプション」として落ちます）
+  取り出して実在を確認します（オプションの一覧は本スクリプトの `case` 文から
+  導出するので、オプションを足したときに検査側を直す必要はありません）
 
 ## audit-repo-protection.sh / apply-repo-protection.sh
 

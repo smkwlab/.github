@@ -304,11 +304,40 @@ jobs:
 
           # 2. 使用例の caller 位置の引数。
           #
-          # オプションとその値を読み飛ばして最初の位置引数を取る。知らない
-          # オプションが来たら落とす。黙って読み飛ばすと、オプションを足した
-          # 日からこの検査が別の語を caller として見始める。
-          value_opts=" --ref --var --model --language --branch "
-          flag_opts=" --apply --direct --update --list-callers --list-candidates -h --help "
+          # caller は位置引数なので、オプションとその値を読み飛ばさないと
+          # 取り出せない。そのオプション表をここに書き写すと、スクリプトと
+          # 二重管理になる。片方だけ変わればこの検査は別の語を caller として
+          # 読み始めるので、まさにこの PR が塞いでいる種類の乖離になる。
+          # スクリプト自身の case 文から導出して、写しを持たない。
+          #
+          # 値を取るかどうかは arm の中身で決まる（shift 2 なら値を取る）。
+          # --* や * のようなグロブの arm は literal な名前ではないので除く。
+          opt_block=$(awk '/^  case "\$1" in$/ {f=1; next} f && /^  esac$/ {exit} f' scripts/distribute-workflow.sh)
+          value_opts=" "
+          flag_opts=" "
+          while IFS= read -r arm; do
+            pat=${arm%%)*}
+            body=${arm#*)}
+            case "$pat" in *'*'*) continue ;; esac
+            # -h|--help のように 1 つの arm が複数の名前を持つ
+            names=${pat//|/ }
+            for n in $names; do
+              case "$n" in -*) ;; *) continue ;; esac
+              if [[ "$body" == *"shift 2"* ]]; then
+                value_opts+="$n "
+              else
+                flag_opts+="$n "
+              fi
+            done
+          done <<<"$opt_block"
+
+          # 導出が空なら落とす。case 文の書式が変わって読めなくなっただけ
+          # かもしれない
+          if [ "$value_opts" = " " ] || [ "$flag_opts" = " " ]; then
+            echo "::error::scripts/distribute-workflow.sh の case 文からオプションを導出できなかった（value:[${value_opts}] flag:[${flag_opts}]）。オプション解析の書式が変わっている"
+            exit 1
+          fi
+
           examples=0
 
           while IFS= read -r hit; do
@@ -316,8 +345,21 @@ jobs:
             rest=${hit#*:}
             lineno=${rest%%:*}
             text=${rest#*:}
-            # バッククォートを外し、コマンド名より前を捨てる
+            # バッククォートを外し、コメント記号と字下げを落とす
             text=${text//\`/}
+            text=${text#\#}
+            text=${text##[[:space:]]}
+            while [ "${text# }" != "$text" ]; do text=${text# }; done
+
+            # コマンドが行頭に来ている行だけを例として扱う。散文の途中に
+            # 名前が出てくる行（英語なら "distribute-workflow.sh renders the
+            # template" のような文）を拾うと、その次の語を caller として
+            # 読んでしまう
+            case "$text" in
+              scripts/distribute-workflow.sh*) ;;
+              ./scripts/distribute-workflow.sh*) ;;
+              *) continue ;;
+            esac
             text=${text#*distribute-workflow.sh}
 
             # 1 行ずつ見るので、caller が継続行（行末 \）の次の行にある例は
@@ -344,7 +386,9 @@ jobs:
                   elif [[ "$flag_opts" == *" $1 "* ]]; then
                     shift
                   else
-                    echo "::error::${file}:${lineno}: この検査が知らないオプション ${1} がある。value_opts / flag_opts に足すこと"
+                    # 導出元はスクリプトの case 文なので、ここに来るのは
+                    # 「例がスクリプトに無いオプションを使っている」場合
+                    echo "::error::${file}:${lineno}: 例が ${1} を使っているが、scripts/distribute-workflow.sh にそのオプションが無い"
                     status=1
                     break
                   fi
@@ -364,7 +408,7 @@ jobs:
                   ;;
               esac
             done
-          done < <(grep -n 'distribute-workflow\.sh' scripts/README.md scripts/distribute-workflow.sh)
+          done < <(grep -n 'scripts/distribute-workflow\.sh' scripts/README.md scripts/distribute-workflow.sh)
 
           # ここも 0 件を成功にしない。例の書き方が変わって当たらなくなった
           # だけかもしれない
@@ -374,7 +418,11 @@ jobs:
           fi
 
           # 3. 付随ファイルの孤児。caller を消すと取り残される。
-          #    --list-callers は *.yml を列挙するので、残っても誰も気付かない
+          #    --list-callers は *.yml を列挙するので、残っても誰も気付かない。
+          #
+          #    どちらも任意のファイルなので、1 件も無いのは正常な状態（10 caller
+          #    のうち .defaults を持つのは 4 件）。ここに 0 件ガードは置かない。
+          #    置き場所が消えた場合は検査 1 の *.yml が 0 件で落ちる
           for f in scripts/callers/*.defaults scripts/callers/*.pr-note.md; do
             n=$(basename "$f")
             n=${n%.defaults}

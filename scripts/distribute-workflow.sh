@@ -54,7 +54,7 @@
 #   scripts/distribute-workflow.sh --list-callers
 #   scripts/distribute-workflow.sh ai-code-review sotsuron-template          # dry-run
 #   scripts/distribute-workflow.sh --apply --model claude-opus-4-8 ai-code-review sotsuron-template
-#   scripts/distribute-workflow.sh --apply --var FOO=bar some-workflow repo-a repo-b
+#   scripts/distribute-workflow.sh --apply --var FILES=sotsuron.tex latex-build repo-a repo-b
 #
 set -euo pipefail
 

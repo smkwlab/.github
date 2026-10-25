@@ -237,6 +237,275 @@ jobs:
           fi
           exit "$status"
 
+      # ドキュメントが名指しする caller が scripts/callers/ に実在するかを、
+      # これまで何も見ていなかった。#61 が claude-mention.yml を claude-qa.yml
+      # にリネームした後、使用例と caller 表が claude-mention を指したまま
+      # 4 か月 13 日残った（#243）。--list-callers は *.yml を列挙するので
+      # 一覧には出ず、矛盾が表に出ない。実行して初めて落ちる。
+      #
+      # 上のアンカー検査と同じ種類の参照で、間違っても何も言わないものが
+      # 2 つめあったということ。配布の入口はドキュメントなので、ここが
+      # 壊れていると「読者が最初に実行するコマンドが唯一動かないもの」になる。
+      - name: Check that the callers named in the docs exist
+        run: |
+          set -euo pipefail
+          # caller 名は ASCII だが散文は日本語。grep / awk をロケールに
+          # 依存させない。C では [a-z] はバイト 0x61-0x7a に当たるので、
+          # 日本語の語が caller 名の形に一致することはない
+          export LC_ALL=C
+          status=0
+
+          shopt -s nullglob
+          callers=()
+          for f in scripts/callers/*.yml; do
+            callers+=("$(basename "$f" .yml)")
+          done
+          # 0 件を成功にしない。置き場所が変わればこの検査は何も見ずに通る
+          if [ "${#callers[@]}" -eq 0 ]; then
+            echo "::error::scripts/callers/ に caller テンプレートが 1 件も無い。置き場所が変わったか、この検査が対象を失っている"
+            exit 1
+          fi
+
+          has_caller() {
+            local c
+            for c in "${callers[@]}"; do
+              if [ "$c" = "$1" ]; then return 0; fi
+            done
+            return 1
+          }
+
+          # 1. caller 表と scripts/callers/ を双方向で突き合わせる。
+          #
+          # 表の節だけを見る。README には同じ書式の表が他にもあり（オプション、
+          # 監査の分類）、全部拾うと --apply などを caller として数える。
+          # 見出しを書き換えた場合は下の 0 件ガードで落ちる。
+          # shellcheck disable=SC2016 # $/ は awk の正規表現アンカーで、シェルに展開させない
+          rows=$(awk '/^### 用意済みの caller テンプレート$/ {f=1; next} /^### / {f=0} f' scripts/README.md \
+                   | sed -n 's/^| `\([a-z][a-z0-9-]*\)` |.*/\1/p')
+          if [ -z "$rows" ]; then
+            echo "::error::scripts/README.md の caller 表から 1 行も取れなかった。見出し「用意済みの caller テンプレート」か表の書式が変わっている"
+            exit 1
+          fi
+
+          while IFS= read -r name; do
+            if ! has_caller "$name"; then
+              echo "::error::scripts/README.md の caller 表が ${name} を挙げているが、scripts/callers/${name}.yml が無い。"
+              status=1
+            fi
+          done <<<"$rows"
+
+          # 逆向き。caller を足して表に書き忘れると、誰も使えないまま残る
+          for c in "${callers[@]}"; do
+            if ! printf '%s\n' "$rows" | grep -qxF "$c"; then
+              echo "::error::scripts/callers/${c}.yml があるのに、scripts/README.md の caller 表に行が無い。"
+              status=1
+            fi
+          done
+
+          # 2. 使用例の caller 位置の引数。
+          #
+          # caller は位置引数なので、オプションとその値を読み飛ばさないと
+          # 取り出せない。そのオプション表をここに書き写すと、スクリプトと
+          # 二重管理になる。片方だけ変わればこの検査は別の語を caller として
+          # 読み始めるので、まさにこの PR が塞いでいる種類の乖離になる。
+          # スクリプト自身の case 文から導出して、写しを持たない。
+          #
+          # 値を取るかどうかは arm の中身で決まる（shift 2 なら値を取る）。
+          # --* や * のようなグロブの arm は literal な名前ではないので除く。
+          #
+          # awk のパターンは case 文の 2 スペース字下げに依存している。
+          # 字下げや書き方が変われば導出は空になり、下のガードで落ちる。
+          # 黙って「オプション無し」として続けないことが要点
+          # 字下げは awk 側で落とす。pat をそのまま使うとエラーメッセージに
+          # 行頭の空白が入る
+          opt_block=$(awk '/^  case "\$1" in$/ {f=1; next} f && /^  esac$/ {exit} f {sub(/^[[:space:]]+/, ""); print}' scripts/distribute-workflow.sh)
+
+          # 読めなかったのなら、ここで落とす。「オプション無し」として先へ
+          # 進まないため。
+          #
+          # 判定は opt_block が空かどうかで行う。どちらかのカテゴリが空なのは
+          # 正当な状態（値を取るオプションが 1 つも無いスクリプトはあり得る）
+          # なので、読めなかったことと混同しない。
+          #
+          # 下のループより前に置く。空文字を <<< に渡すと空の 1 行が読まれ、
+          # arm の検査が名前の無い arm について誤ったメッセージを出す
+          if [ -z "$opt_block" ]; then
+            echo "::error::scripts/distribute-workflow.sh の case 文を読めなかった。オプション解析の書式が変わっている"
+            exit 1
+          fi
+
+          value_opts=" "
+          flag_opts=" "
+          while IFS= read -r arm; do
+            pat=${arm%%)*}
+            body=${arm#*)}
+            # arm でない行（case 文の中のコメントや空行）は飛ばす。これを
+            # 飛ばさないと pat が行全体・body が空になり、下の ;; 検査が
+            # 「1 行に収まっていない」と誤報する。case 文にコメントを 1 行
+            # 足しただけで CI が落ちることになる
+            case "$arm" in *')'*) ;; *) continue ;; esac
+            case "$pat" in -*) ;; *) continue ;; esac
+            # グロブを含む arm（--*、*、-? など）は literal な名前ではない。
+            # ここで落とすことが、下の $names 展開がパス名展開に晒されない
+            # ことも担保している
+            case "$pat" in *[\*?[]*) continue ;; esac
+            # arm が複数行に分かれていると body に shift 2 が入らず、値を取る
+            # オプションをフラグと誤分類する。すると例の中でその値が caller の
+            # 位置に見えて、無関係な語を「caller が無い」と報告し始める。
+            # 1 行に収まっていることを前提にしているので、前提が崩れたら落とす
+            case "$body" in
+              *';;'*) ;;
+              *)
+                echo "::error::scripts/distribute-workflow.sh の case 文の arm (${pat}) が 1 行に収まっていない。この導出は 1 行 arm を前提にしている"
+                exit 1
+                ;;
+            esac
+            # 値を取る arm が shift 2 を使うという前提は、崩れても静かに
+            # 誤分類するだけで、ほかの前提のように落ちてはくれない。$2 を
+            # 読んでいるのに shift 2 が無い arm は前提が崩れた印なので落とす
+            # shellcheck disable=SC2016 # ${2 は照合したい文字列そのもの
+            case "$body" in
+              *'${2'*)
+                case "$body" in
+                  *'shift 2'*) ;;
+                  *)
+                    echo "::error::scripts/distribute-workflow.sh の arm (${pat}) は 2 番目の引数を読んでいるが shift 2 が無い。値を取るオプションの判定が shift 2 を前提にしている"
+                    exit 1
+                    ;;
+                esac
+                ;;
+            esac
+            # -h|--help のように 1 つの arm が複数の名前を持つ。グロブを含む
+            # arm は上で落としてあるので、引用符なしの展開でパス名展開は起きない
+            names=${pat//|/ }
+            for n in $names; do
+              case "$n" in -*) ;; *) continue ;; esac
+              if [[ "$body" == *"shift 2"* ]]; then
+                value_opts+="$n "
+              else
+                flag_opts+="$n "
+              fi
+            done
+          done <<<"$opt_block"
+
+
+          examples=0
+
+          while IFS= read -r hit; do
+            file=${hit%%:*}
+            rest=${hit#*:}
+            lineno=${rest%%:*}
+            text=${rest#*:}
+            # バッククォートを外し、コメント記号と字下げを落とす
+            text=${text//\`/}
+            # 先頭のコメント記号と空白をすべて落とす。${text#\#} や
+            # ${text##[[:space:]]} は 1 文字しか落ちないので、`##` で始まる行や
+            # タブ字下げの行が下の照合をすり抜け、黙って検査対象外になる。
+            # 「検査されなかった」が「一致」と区別できなくなるのが、この検査が
+            # 持ってはいけない唯一の状態
+            while :; do
+              case "$text" in
+                '#'* | [[:space:]]*) text=${text#?} ;;
+                *) break ;;
+              esac
+            done
+
+            # コマンドが行頭に来ている行だけを例として扱う。散文の途中に
+            # 名前が出てくる行（英語なら "distribute-workflow.sh renders the
+            # template" のような文）を拾うと、その次の語を caller として
+            # 読んでしまう
+            case "$text" in
+              scripts/distribute-workflow.sh*) ;;
+              ./scripts/distribute-workflow.sh*) ;;
+              *) continue ;;
+            esac
+            text=${text#*distribute-workflow.sh}
+
+            # 1 行ずつ見るので、caller が継続行（行末 \）の次の行にある例は
+            # 検査されない。今の例はすべて caller を 1 行目に置いている
+            # shellcheck disable=SC2086 # 例の行を引数に割るのがここの目的
+            set -- $text
+            while [ "$#" -gt 0 ]; do
+              case "$1" in
+                # 行末コメント。ここから先に caller は無い
+                '#'*) break ;;
+                # <caller> や [options]。例ではなく書式の説明なので対象外
+                '<'* | '['*) break ;;
+                -*)
+                  if [[ "$value_opts" == *" $1 "* ]]; then
+                    # 値が無いまま行が終わっているのは、例そのものが不完全。
+                    # 黙って break すると、その行が検査されなかったことが
+                    # 一致と区別できなくなる
+                    if [ "$#" -lt 2 ]; then
+                      echo "::error::${file}:${lineno}: ${1} に値が無い。例が不完全"
+                      status=1
+                      break
+                    fi
+                    shift 2
+                  elif [[ "$flag_opts" == *" $1 "* ]]; then
+                    shift
+                  else
+                    # 導出元はスクリプトの case 文なので、ここに来るのは
+                    # 「例がスクリプトに無いオプションを使っている」場合
+                    echo "::error::${file}:${lineno}: 例が ${1} を使っているが、scripts/distribute-workflow.sh にそのオプションが無い"
+                    status=1
+                    break
+                  fi
+                  ;;
+                *)
+                  # caller 名の形に合うものが最初の位置引数。合わないものが
+                  # 来たら打ち切る。散文に埋め込まれた例（「--list-callers で
+                  # 一覧できます」など）の日本語を caller として読まないため
+                  if [[ "$1" =~ ^[a-z][a-z0-9-]*$ ]]; then
+                    examples=$((examples + 1))
+                    if ! has_caller "$1"; then
+                      echo "::error::${file}:${lineno}: 使用例が caller ${1} を名指ししているが、scripts/callers/${1}.yml が無い。"
+                      status=1
+                    fi
+                  fi
+                  break
+                  ;;
+              esac
+            done
+          #
+          # スクリプト自身も対象に含める。usage() が sed でヘッダのコメントを
+          # そのまま --help の出力にしているので、ヘッダの例は内部コメントでは
+          # なくユーザ向けのヘルプ本文であり、今回の誤りが 4 か月生き延びた
+          # 場所でもある。行頭照合があるので、名前が文の途中に出てくる行
+          # （この grep の行自身を含む）は対象にならない
+          done < <(grep -n 'scripts/distribute-workflow\.sh' scripts/README.md scripts/distribute-workflow.sh)
+
+          # ここも 0 件を成功にしない。例の書き方が変わって当たらなくなった
+          # だけかもしれない
+          if [ "$examples" -eq 0 ]; then
+            echo "::error::caller を名指しする使用例が 1 件も見つからなかった。例の書式が変わってこの検査が当たらなくなっている可能性がある"
+            exit 1
+          fi
+
+          # 3. 付随ファイルの孤児。caller を消すと取り残される。
+          #    --list-callers は *.yml を列挙するので、残っても誰も気付かない。
+          #
+          #    どちらも任意のファイルなので、1 件も無いのは正常な状態（10 caller
+          #    のうち .defaults を持つのは 4 件）。ここに 0 件ガードは置かない。
+          #    置き場所が消えた場合は検査 1 の *.yml が 0 件で落ちる
+          #    拡張子の剥がしは、1 つのファイル名が両方の接尾辞を持たない
+          #    ことを前提にしている（foo.defaults か foo.pr-note.md のどちらか）。
+          #    前提が崩れた名前でも、探す .yml が見つからず落ちるだけで黙らない
+          for f in scripts/callers/*.defaults scripts/callers/*.pr-note.md; do
+            n=$(basename "$f")
+            n=${n%.defaults}
+            n=${n%.pr-note.md}
+            if [ ! -f "scripts/callers/${n}.yml" ]; then
+              echo "::error::${f} に対応する scripts/callers/${n}.yml が無い。caller を消したときの取り残し。"
+              status=1
+            fi
+          done
+
+          if [ "$status" -eq 0 ]; then
+            echo "Docs and scripts/callers/ agree (${#callers[@]} callers, ${examples} examples)."
+          fi
+          exit "$status"
+
       # Two invariants about what may auto-merge, which no validator reads.
       #
       # A. custom.regex updates must not auto-merge beyond patch. What lets

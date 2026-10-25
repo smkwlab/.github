@@ -76,6 +76,7 @@ unknown=0
 no_renovate=()
 no_renovate_dormant=()
 unclassified=()
+unclassified_with_config=()
 report() { drift=$((drift + 1)); log "  drift: $1"; }
 leaked() { leak=$((leak + 1)); log "  leak: $1"; }
 unsure() { unknown=$((unknown + 1)); log "  unknown: $1"; }
@@ -103,7 +104,9 @@ PROJECT_TEMPLATES="webapp_devenv sql-webapp-template sql-webapp-vue-template"
 # リポジトリ名が学籍番号で始まるか。先頭の k が無い世代の表記があるので k は
 # 任意にする。学科コードは jk（2016 年学部入学まで）、rs（2017 年入学以降）、
 # gjk（大学院）。この判定は生成元が記録されていないリポジトリにも効く。
-student_named() { printf '%s' "$1" | grep -qE '^k?[0-9]{2}(rs|jk|gjk)[0-9]+'; }
+#
+# 母数の分だけ呼ぶので grep は使わない。bash の組み込みで済ませる。
+student_named() { [[ $1 =~ ^k?[0-9]{2}(rs|jk|gjk)[0-9]+ ]]; }
 
 # in_list <値> <空白区切りのリスト>
 in_list() {
@@ -174,6 +177,14 @@ fi
 map_rows=$(wc -l < "$map_file" | tr -d ' ')
 if [ "$map_rows" -ge "$REPO_LIST_LIMIT" ]; then
     log "ERROR: 生成元の対応表が上限 ${REPO_LIST_LIMIT} 件に達した。REPO_LIST_LIMIT を上げてください"
+    exit 1
+fi
+# 0 件は「生成物が無い」ではなく取得の失敗。gh は成功して空を返すことがある。
+# このまま進むと全リポジトリが対応表に無い扱いになり、unknown が母数と同じ
+# 件数だけ並ぶ。0 件と数えていないを混同しないのがこの監査の主旨なので、
+# 対応表についても同じように扱う。
+if [ "$map_rows" -eq 0 ]; then
+    log "ERROR: 生成元の対応表が空だった（org に 1 件もリポジトリが無いことはない）"
     exit 1
 fi
 
@@ -272,11 +283,11 @@ while IFS=$'\t' read -r name vis pushed ss is_tmpl source; do
         ;;
     unknown)
         # 宣言されていないテンプレート由来。leak とも drift とも言えないので
-        # どちらにも数えず、判断待ちとして一覧に出す
+        # どちらにも数えず、判断待ちとして一覧に出す。
+        # 一覧はコピーして使われるので名前を装飾しない。設定の有無は別に数える
+        unclassified+=("$name")
         if [ "$has_config" = true ]; then
-            unclassified+=("${name}(renovate設定あり)")
-        else
-            unclassified+=("$name")
+            unclassified_with_config+=("$name")
         fi
         ;;
     esac
@@ -335,6 +346,13 @@ fi
 log "info: Renovate の対象か判断が付かないリポジトリ ${#unclassified[@]} 件（宣言されていないテンプレート由来）"
 if [ "${#unclassified[@]}" -gt 0 ]; then
     printf '%s\n' "${unclassified[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed -e 's/ *$//' -e 's/^/    /'
+fi
+# 設定を持つものは分類が決まれば leak か drift のどちらかになる。決まるまでは
+# どちらとも言えないが、件数は分けて出す。名前を装飾すると上の一覧が
+# リポジトリ名として貼れなくなるため、ここで別に出す。
+log "      うち renovate 設定を持つもの ${#unclassified_with_config[@]} 件（分類が決まれば leak か drift のどちらかになる）"
+if [ "${#unclassified_with_config[@]}" -gt 0 ]; then
+    printf '%s\n' "${unclassified_with_config[@]}" | sort | paste -sd' ' - | fold -w 100 -s | sed -e 's/ *$//' -e 's/^/    /'
 fi
 
 log "---"

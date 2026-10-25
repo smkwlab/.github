@@ -339,7 +339,16 @@ jobs:
           while IFS= read -r arm; do
             pat=${arm%%)*}
             body=${arm#*)}
-            case "$pat" in *'*'*) continue ;; esac
+            # arm でない行（case 文の中のコメントや空行）は飛ばす。これを
+            # 飛ばさないと pat が行全体・body が空になり、下の ;; 検査が
+            # 「1 行に収まっていない」と誤報する。case 文にコメントを 1 行
+            # 足しただけで CI が落ちることになる
+            case "$arm" in *')'*) ;; *) continue ;; esac
+            case "$pat" in -*) ;; *) continue ;; esac
+            # グロブを含む arm（--*、*、-? など）は literal な名前ではない。
+            # ここで落とすことが、下の $names 展開がパス名展開に晒されない
+            # ことも担保している
+            case "$pat" in *[\*?[]*) continue ;; esac
             # arm が複数行に分かれていると body に shift 2 が入らず、値を取る
             # オプションをフラグと誤分類する。すると例の中でその値が caller の
             # 位置に見えて、無関係な語を「caller が無い」と報告し始める。

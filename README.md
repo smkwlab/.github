@@ -410,7 +410,9 @@ jobs:
 
 ### prevent-draft-merge.yml
 
-draft ブランチの誤マージを防止します。`final-*` タグが付いている場合のみマージを許可。また、base も draft ブランチである同期 PR（`sync-next-draft.yml` がコンフリクト時に作成）はマージを許可します。
+draft ブランチの誤マージを防止します。base も draft ブランチである同期 PR（`sync-next-draft.yml` がコンフリクト時に作成）はマージを許可します。
+
+`final-*` タグによる免除はありません。提出 PR は `auto-final-merge.yml` が GITHUB_TOKEN で作成するため、GITHUB_TOKEN 起因のイベントでは workflow run が起動しないという GitHub の仕様により、この workflow はそもそも提出 PR 上で走りません（#252）。
 
 ### auto-final-merge.yml
 

@@ -75,22 +75,13 @@ jobs:
             exit 1
           fi
 
-          # Check for final-* tags
-          echo "::debug::Checking for final-* tags..."
-          TAGS_AT_HEAD=""
-          if TAGS_AT_HEAD=$(git tag --points-at HEAD 2>/dev/null); then
-            if echo "$TAGS_AT_HEAD" | grep -q "^final-"; then
-              FINAL_TAG=$(echo "$TAGS_AT_HEAD" | grep "^final-" | head -1)
-              {
-                echo "is_draft=false"
-                echo "is_final_submission=true"
-                echo "final_tag=$FINAL_TAG"
-              } >> "$GITHUB_OUTPUT"
-              echo "Final submission detected - merge allowed"
-              echo "::notice::Final submission tag: $FINAL_TAG"
-              exit 0
-            fi
-          fi
+          # There is deliberately no final-* tag exemption here. The final
+          # submission PR is opened by auto-final-merge.yml with GITHUB_TOKEN,
+          # and GitHub starts no workflow run for a GITHUB_TOKEN event, so this
+          # workflow never runs on that PR at all (#252). The exemption that
+          # used to sit here read `git tag --points-at HEAD`, which on
+          # pull_request is the merge commit GitHub synthesizes and so never
+          # carries the tag -- it could not have fired either way.
 
           # Allow draft-to-draft sync PRs created by sync-next-draft.yml:
           # the base must be exactly the NEXT draft of the head branch
@@ -177,17 +168,11 @@ jobs:
         if: steps.skip-check.outputs.skip != 'true' && steps.check-draft.outputs.is_draft == 'false'
         env:
           HEAD_REF: ${{ github.head_ref }}
-          IS_FINAL: ${{ steps.check-draft.outputs.is_final_submission }}
-          FINAL_TAG: ${{ steps.check-draft.outputs.final_tag }}
           DRAFT_TYPE: ${{ steps.check-draft.outputs.draft_type }}
         run: |
           BRANCH_NAME="$HEAD_REF"
 
-          if [[ "$IS_FINAL" == "true" ]]; then
-            echo "Final submission branch - merge allowed"
-            echo "Branch name: $BRANCH_NAME"
-            echo "Final submission tag: $FINAL_TAG"
-          elif [[ "$DRAFT_TYPE" == "sync" ]]; then
+          if [[ "$DRAFT_TYPE" == "sync" ]]; then
             echo "Draft-to-draft sync PR - merge allowed"
             echo "Branch name: $BRANCH_NAME"
           else

@@ -26,9 +26,28 @@ jobs:
 
       - name: Skip if propagate-workflow merge
         id: skip-check
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # Get the latest commit message
-          COMMIT_MSG=$(git log -1 --pretty=%B)
+          # Read the head branch tip, not HEAD. On pull_request,
+          # actions/checkout checks out refs/pull/N/merge, so HEAD is the merge
+          # commit GitHub generates ("Merge <head> into <base>") -- never the
+          # propagate-workflow merge this step looks for, which is why it had
+          # never fired (#248). fetch-depth: 0 fetches both parents of the
+          # merge ref, so the head commit is present. The fallbacks keep the
+          # previous behaviour when called from something other than a
+          # pull_request, and when the recorded head sha is unreachable (e.g. a
+          # force-push after the event): reading the merge commit yields
+          # skip=false, which blocks as before. Why the fallback is taken goes
+          # to the debug log -- this step gates a safety rail, so a silent
+          # fallback would leave nothing to follow when it misjudges.
+          GIT_ERR=$(mktemp)
+          if ! COMMIT_MSG=$(git log -1 --pretty=%B "${HEAD_SHA:-HEAD}" \
+              2>"$GIT_ERR"); then
+            echo "::debug::Falling back to HEAD: $(cat "$GIT_ERR")"
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+          fi
+          rm -f "$GIT_ERR"
           echo "::debug::Commit message: $COMMIT_MSG"
 
           if echo "$COMMIT_MSG" | grep -q "to reconcile workflow history"; then

@@ -34,7 +34,7 @@ on:
       elixir-version:
         description: 'Elixir version'
         # renovate: datasource=github-releases depName=elixir-lang/elixir packageName=elixir-lang/elixir versioning=semver extractVersion=^v(?<version>.*)$
-        default: '1.20.4'
+        default: '1.20.5'
         required: false
         type: string
       dependency-audit-timeout:

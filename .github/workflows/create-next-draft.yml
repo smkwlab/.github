@@ -133,22 +133,44 @@ jobs:
 
           echo "Created $NEXT_BRANCH based on $CURRENT_BRANCH"
 
+      # The student reads this when the next draft branch is not in their
+      # checkout yet, so saying it exists is not enough: give the operation
+      # that brings it in, and what happens if they keep writing on the
+      # branch they are on. Both cases (created, already there) differ only
+      # in the first line, so they share one body -- two copies of the same
+      # Japanese text would get fixed one at a time (#262).
       - name: Add comment to PR
-        if: steps.check-branch.outputs.exists == 'false'
+        if: steps.check-branch.outputs.exists != 'skip'
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CURRENT_BRANCH: ${{ steps.next-branch.outputs.current_branch }}
+          NEXT_BRANCH: ${{ steps.next-branch.outputs.next_branch }}
+          BRANCH_EXISTED: ${{ steps.check-branch.outputs.exists }}
         run: |
-          NEXT_BRANCH="${{ steps.next-branch.outputs.next_branch }}"
+          set -eu
 
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body "Next draft branch has been automatically created: \`$NEXT_BRANCH\`"
+          if [ "$BRANCH_EXISTED" = true ]; then
+            heading="次の稿を書くブランチ \`${NEXT_BRANCH}\` は既にあります。"
+          else
+            heading="次の稿を書くブランチ \`${NEXT_BRANCH}\` を作成しました。"
+          fi
 
-      - name: Add notice if branch exists
-        if: steps.check-branch.outputs.exists == 'true'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          NEXT_BRANCH="${{ steps.next-branch.outputs.next_branch }}"
+          # ${var} でなく $var と書くと、UTF-8 ロケールの bash が直後の多バイト
+          # 文字の 1 バイト目を変数名に取り込み、unbound variable で本文が空に
+          # なることがある
+          body=$(cat <<EOF
+          ${heading}
 
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body "Next draft branch already exists: \`$NEXT_BRANCH\`"
+          手元に取り込むには、GitHub Desktop で次の操作をします。
+
+          1. \`Fetch origin\` をクリック
+          2. \`Current Branch\` をクリックし、\`origin/${NEXT_BRANCH}\` を選んで \`Create branch\`
+
+          **この PR の添削対応は \`${CURRENT_BRANCH}\` で、次の稿の執筆は \`${NEXT_BRANCH}\` で行います。** 切り替えずに書き続けると、次の稿の内容がこの PR の差分に入ります。
+
+          操作手順の詳細: [GITHUB-DESKTOP-GUIDE.md](https://github.com/smkwlab/latex-ecosystem/blob/main/docs/GITHUB-DESKTOP-GUIDE.md)
+          EOF
+          )
+
+          gh pr comment "$PR_NUMBER" --body "$body"

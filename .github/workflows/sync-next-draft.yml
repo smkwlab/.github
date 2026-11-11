@@ -179,9 +179,14 @@ jobs:
           # review PR once they are done with its comments.
           review_pr_of() {
             local branch="$1" exclude_base="$2" state="$3"
+            local filter
+            # Say "newest first" in the filter instead of relying on the order
+            # gh happens to return: the closed-PR fallback can see more than
+            # one PR for a branch (a student may close one and open another).
+            filter="[.[] | select(.baseRefName != \"$exclude_base\")]"
+            filter="$filter | sort_by(.createdAt) | reverse | .[0].number // empty"
             gh pr list --head "$branch" --state "$state" \
-              --json number,baseRefName \
-              --jq "[.[] | select(.baseRefName != \"$exclude_base\")][0].number // empty"
+              --json number,baseRefName,createdAt --jq "$filter"
           }
 
           nudge_body() {
